@@ -1,12 +1,14 @@
+use std::collections::hash_map::RandomState;
 // Project imports
 use std::collections::HashMap;
+use std::ops::Deref;
 use rand::Rng;
 use strum::IntoEnumIterator;
 use robotics_lib::energy::Energy;
-use robotics_lib::event::events::Event;
+use robotics_lib::event::events::{self, Event};
 use robotics_lib::interface::Tools;
 use robotics_lib::interface::{craft, debug, destroy, go, look_at_sky, teleport, Direction};
-use robotics_lib::runner::backpack::BackPack;
+use robotics_lib::runner::backpack::{self, BackPack};
 use robotics_lib::runner::{Robot, Runnable, Runner};
 use robotics_lib::world::coordinates::Coordinate;
 use robotics_lib::world::environmental_conditions::EnvironmentalConditions;
@@ -23,16 +25,49 @@ use robotics_lib::world::World;
 
 // Frontend
 use yew::prelude::*;
+use yew::{function_component, html, Html, Properties};
+extern crate yewdux;
+use yewdux::prelude::*;
+// use yew_agent::{Agent, AgentLink, Context};
+use bounce::*;
+use std::rc::Rc;
+use std::cell::RefCell;
+
 use log::info;
 use wasm_bindgen::JsValue;
+
+
+// enums to allow updates inside the impl
+#[derive(Clone, PartialEq, Store, Atom)]
+struct BackpackState {
+    size: usize,
+    content: HashMap<Content, usize>,
+}
+
+impl Default for BackpackState {
+    fn default() -> Self {
+        Self {
+            size: 0,
+            content: HashMap::new()
+        }
+    }
+}
+
 
 #[function_component(Ai)]
 pub fn ai() -> Html {
     let msg = JsValue::from(format!("Setting up world..."));
     info!("{}", msg.as_string().unwrap());
 
+    // USESTATES
+    let backState:UseAtomHandle<BackpackState> = use_atom::<BackpackState>();
+    // let mut useless:HashMap<Content, usize> = HashMap::new();
+    // useless.insert(Content::None, 0);
+    // let useless2: (usize, HashMap<Content, usize>) = (0, useless);
+    // let mut backpackState = use_state(||useless2);
+
     // Setup world
-    struct MyRobot(Robot);
+    struct MyRobot(Robot, UseAtomHandle<BackpackState>);
     struct WorldGenerator {
         size: usize,
     }
@@ -105,6 +140,8 @@ pub fn ai() -> Html {
             (map, (0, 0), environmental_conditions, max_score, None)
         }
     }
+
+    
     impl Runnable for MyRobot {
         fn process_tick(&mut self, world: &mut World) {
             for _ in 0..1 {
@@ -195,6 +232,28 @@ pub fn ai() -> Html {
             // Logs the event to the console
             let msg = JsValue::from(format!("{:?}", event));
             info!("{}", msg.as_string().unwrap());
+            // Backpack Updates
+            let backStatus = self.1.clone();
+            match event {Event::AddedToBackpack(_,_)|Event::RemovedFromBackpack(_,_)=>{
+                let newBack = self.get_backpack();
+                let newBackContent = newBack.get_contents();
+                let newInside:HashMap<Content, usize> = (newBackContent.iter()).map(|content| (content.0.to_owned(), content.1.to_owned())).collect();
+                // HERE Implement the code to update a state inside the ai function component with the value of backpack size and content
+                // update_backpack_please(newBack.get_size(), newInside);
+                backStatus.set(BackpackState { size: newBack.get_size(), content: newInside });
+            }
+            // Event::Ready => todo!(),
+            // Event::Terminated => todo!(),
+            // Event::TimeChanged(_) => todo!(),
+            // Event::DayChanged(_) => todo!(),
+            // Event::EnergyRecharged(_) => todo!(),
+            // Event::EnergyConsumed(_) => todo!(),
+            // Event::Moved(_, _) => {
+            //     // self.0.
+            // },
+            // Event::TileContentUpdated(_, _) => todo!(), 
+            _ => println!("Before")};
+            
             println!();
         }
 
@@ -220,9 +279,24 @@ pub fn ai() -> Html {
         }
     }
 
-    // RUNNING THE GAME
+    // fn update_backpack_please(newSize:usize, newContent: HashMap<Content, usize>) {
+    //     // let backDispatch = use_store::<BackpackState>();
+    //     // backDispatch.run(|counter| counter.count += 1);
+    //     let backState:UseAtomHandle<BackpackState> = use_atom::<BackpackState>();
+    //     let backState = backState.clone();
 
-    let r = MyRobot(Robot::new());
+    //     Callback::from(move |e: Event| {
+    //         let input: HtmlInputElement = e.target_unchecked_into();
+
+    //         username.set(Username { inner: input.value().into() });
+    //     });
+    //     let msg = JsValue::from(format!("{} {:?}", newSize, newContent));
+    //     info!("[ BACKPACK ] {}", msg.as_string().unwrap());
+        
+    // }
+    
+    // RUNNING THE GAME
+    let r = MyRobot(Robot::new(), backState.clone());
     struct Tool;
     impl Tools for Tool {}
     let mut generator = WorldGenerator::init(4);
@@ -236,9 +310,32 @@ pub fn ai() -> Html {
         | Err(e) => println!("{:?}", e),
     }
     html! {
-        <div id="grid">
+        <div id="info">
+            <BackP/>
+        </div>
+        // <div id="grid">
             
+        // </div>
+        
+    }
+}
+
+// #[derive(Properties, PartialEq)]
+// pub struct BackProps {
+//     size : usize,
+//     // contents: HashMap<Content, usize>,
+// }
+
+#[function_component(BackP)]
+pub fn backpack() -> Html {
+    let backState = use_atom::<BackpackState>();
+    html! {
+        <div id={"backpack"}>
+            <h2>{"Backpack"}</h2>
+            <hr/>
+            {"Size: "}{ &backState.size}
+            <br/>
+            {"Contents: "}{ format!("{:?}", &backState.content)}
         </div>
     }
-    
 }

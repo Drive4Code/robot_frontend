@@ -1,6 +1,6 @@
 [package]
 name = "frontend-wasm"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -33,3 +33,6 @@ log = "0.4.6"
 # trunk = "0.18"
 implicit-clone= {version="0.3.6"}
 yew = { version="0.21", features = ["csr"] }
+yew-agent = "0.3"
+yewdux = "0.10"
+bounce = "0.9.0"

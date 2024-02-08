@@ -1,7 +1,7 @@
 // Frontend
 use yew::prelude::*;
 use wasm_bindgen::prelude::*;
-
+use bounce::BounceRoot;
 mod ai;
 use ai::Ai;
 
@@ -11,8 +11,11 @@ fn app() -> Html {
 
     html! {
         <>
-        <h1>{ "Hello World" }</h1>
-        <Ai/>
+        <BounceRoot>
+            <h1>{ "Robot Pripiat" }</h1>
+            <Ai/>
+        </BounceRoot>
+        
         </>
     }
 }
