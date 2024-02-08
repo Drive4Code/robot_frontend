@@ -124,12 +124,14 @@ dependencies = [
  "getrandom",
  "implicit-clone 0.3.9",
  "lazy_static",
+ "log",
  "rand",
  "robotics_lib",
  "serde",
  "strum",
  "strum_macros",
  "wasm-bindgen",
+ "wasm-logger",
  "yew",
 ]
 
@@ -1193,6 +1195,17 @@ name = "wasm-bindgen-shared"
 version = "0.2.91"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4f186bd2dcf04330886ce82d6f33dd75a7bfcf69ecf5763b89fcde53b6ac9838"
+
+[[package]]
+name = "wasm-logger"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "074649a66bb306c8f2068c9016395fa65d8e08d2affcbf95acf3c24c3ab19718"
+dependencies = [
+ "log",
+ "wasm-bindgen",
+ "web-sys",
+]
 
 [[package]]
 name = "web-sys"
