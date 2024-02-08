@@ -1,0 +1,33 @@
+[package]
+name = "frontend-wasm"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+
+
+[lib]
+crate-type = ["cdylib"]
+path = "src/lib.rs"
+
+[dependencies]
+"robotics_lib" = {path="../Robotic-Lib"}
+lazy_static = "1.4.0"
+rand = { version = "0.8.5", features = [] }
+strum = "0.26.1"
+strum_macros = { version = "0.26.1", features = [] }
+serde = { version = "1.0.193", features = ["derive"] }
+
+# "client" = {path="../robot_web_python/client_example"}
+# tungstenite = "0.21"
+# tokio = { version = "1.35.0", features = ["full"] }
+# url = "1.7.2"
+
+# Frontend Dependencies
+getrandom = { version = "0.2", features = ["js"] }
+wasm-bindgen = "0.2"
+# Yew Dependencies
+# trunk = "0.18"
+implicit-clone= {version="0.3.6"}
+yew = { version="0.21", features = ["csr"] }
