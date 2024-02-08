@@ -2,8 +2,8 @@
 use yew::prelude::*;
 use wasm_bindgen::prelude::*;
 use bounce::BounceRoot;
-mod ai;
-use ai::Ai;
+mod interface;
+use interface::{Main, ActivateAi};
 
 #[function_component(App)]
 fn app() -> Html {
@@ -13,7 +13,8 @@ fn app() -> Html {
         <>
         <BounceRoot>
             <h1>{ "Robot Pripiat" }</h1>
-            <Ai/>
+            <Main/>
+            <ActivateAi/>
         </BounceRoot>
         
         </>
