@@ -295,7 +295,7 @@ pub fn ai() -> Html{
             println!("HERE {:?}", teleport(self, world, (1, 1)));
             // Update UI State
             let worldStatus = self.2.clone();
-            worldStatus.set(WorldState{world:robot_view(self,world), size: 0 });
+            worldStatus.set(WorldState{world:robotics_lib::interface::robot_map(world).unwrap_or_default(), size: 0 });
         }
 
 
@@ -359,7 +359,7 @@ pub fn ai() -> Html{
             &mut self.0.backpack
         }
 
-    }
+    } 
 
 
 
@@ -370,6 +370,7 @@ pub fn ai() -> Html{
     struct Tool;
     impl Tools for Tool {}
     let mut generator = WorldGenerator::init(4);
+    // let mut generator = rip_worldgenerator::MyWorldGen::new();
     let run = Runner::new(Box::new(r), &mut generator);
     //Known bug: 'check_world' inside 'Runner::new()' fails every time
     println!("AO");
@@ -412,10 +413,57 @@ pub fn backpack() -> Html {
             <hr/>
             {"Size: "}{ &backState.size}
             <br/>
-            {"Contents: "}{ format!("{:?}", &backState.content)}
+            {"Contents: "} //{ format!("{:?}", &backState.content)}
+            { for backState.content.iter().map(|content| {
+                match content.1 {
+                    0 => html! {<></>},
+                    _ => html! {
+                        <BackItem content={content.0.clone()} size={content.1.clone()}/>
+                    }
+                }
+                
+            })}
         </div>
     }
 }
+
+#[derive(Properties, PartialEq)]
+pub struct BackItemProps {
+    content: Content,
+    size: usize,
+}
+
+
+#[function_component(BackItem)]
+fn backItem(props: &BackItemProps) -> Html {
+    let img_display:&str;
+    match props.content {
+        Rock(_) => img_display = "https://www.freeiconspng.com/uploads/rock-stone-png-picture-0.png",
+        Tree(_) => img_display = "https://pluspng.com/img-png/tree-png-tree-png-1903-2304-1903.png",
+        Garbage(_) => img_display = "https://www.pngmart.com/files/7/Garbage-PNG-Clipart.png",
+        Fire => img_display = "https://i1.wp.com/sreditingzone.com/wp-content/uploads/2018/07/fire-png-6.png?resize=859,1024&ssl=1",
+        Coin(_) => img_display = "https://webstockreview.net/images/coin-clipart-fandom-7.png",
+        Bin(_) => img_display = "https://purepng.com/public/uploads/large/purepng.com-trash-cantrash-cansteelplasticdustbinrecyclebin-1421526645886ziucf.png",
+        Crate(_) => img_display = "https://www.textures4photoshop.com/tex/thumbs/wooden-box-PNG-free-thumb19.png",
+        Bank(_) => img_display = "https://pngimg.com/uploads/bank/bank_PNG24.png",
+        Water(_) => img_display = "https://pngimg.com/uploads/water/water_PNG3290.png",
+        Market(_) => img_display = "https://static.vecteezy.com/system/resources/previews/013/822/272/original/3d-illustration-store-market-png.png",
+        Fish(_) => img_display = "https://www.freeiconspng.com/uploads/fish-png-4.png",
+        Building => img_display = "https://www.pngmart.com/files/21/3D-Building-PNG-Pic.png",
+        Bush(_) => img_display = "https://pluspng.com/img-png/bush-png-bush-png-image-1024.png",
+        JollyBlock(_) => img_display = "https://www.tynker.com/minecraft/editor/block/diamond_block/5cc07b98cebfbd1c2154195a/?image=true",
+        Scarecrow => img_display = "https://clipground.com/images/scarecrow-png.png",
+        Content::None => img_display = "https://www.freeiconspng.com/uploads/no-image-icon-11.PNG",        
+}
+    html! {
+        <div class={classes!("back_item")}>
+            <img  src={img_display}/>
+            <h3>{format!("x{}", props.size)}</h3>
+        </div>
+        
+    }
+}
+
 
 #[function_component(MapView)]
 pub fn map_view() -> Html {
@@ -429,7 +477,7 @@ pub fn map_view() -> Html {
                         { for row.iter().map(|tile_option| {
                             match tile_option {
                                 Some(tile) => html! {<MapTile tile={tile.clone()} />},
-                                None => html! {<img class={classes!("tile")} src="https://cdn.fabricut.com/img/product_images/4113001.jpg" />},
+                                None => html! {<></>},
                             }
                         })}
                     </div>
@@ -446,7 +494,7 @@ pub struct MapTileProps {
 
 #[function_component(MapTile)]
 pub fn map_tile(props: &MapTileProps) -> Html {
-    let mut img_display:&str;
+    let img_display:&str;
     match props.tile.tile_type {
         TileType::Wall=>img_display="https://static.wikia.nocookie.net/terraria_gamepedia/images/3/3e/Wood_Wall_%28placed%29.png/revision/latest?cb=20160525222715&format=original",
         DeepWater=>img_display="https://static.wikia.nocookie.net/terraria_gamepedia/images/9/9d/Water.png/revision/latest?cb=20200809004326&format=original",
@@ -461,26 +509,40 @@ pub fn map_tile(props: &MapTileProps) -> Html {
         Teleport(_) => img_display="https://gamepedia.cursecdn.com/minecraft_es_gamepedia/e/e4/NetherPortal.gif?version=ee833d337bb150e012426cb883b337a7", 
 }
     html! {
-        <img class={classes!("tile")} src={img_display}/>
+        <div class={classes!("tile")}>
+            <img class={classes!("tile_type")} src={img_display}/>
+            <MapTileContent tile={props.tile.clone()}/>
+        </div>
+        
     }
 }
 
 #[function_component(MapTileContent)]
 pub fn map_tile_content(props: &MapTileProps) -> Html {
-    let mut img_display:&str;
-    match props.tile.tile_type {
-        TileType::Wall => {
-            match props.tile.content {
-                Fire => img_display = "https://pluspng.com/img-png/fire-png--983.png",
-                _ => {
-                    img_display = "ERR";
-                }
-            }
-        }
+    let img_display:&str;
+    match props.tile.content {
+        Rock(_) => img_display = "https://www.freeiconspng.com/uploads/rock-stone-png-picture-0.png",
+        Tree(_) => img_display = "https://pluspng.com/img-png/tree-png-tree-png-1903-2304-1903.png",
+        Garbage(_) => img_display = "https://www.pngmart.com/files/7/Garbage-PNG-Clipart.png",
+        Fire => img_display = "https://i1.wp.com/sreditingzone.com/wp-content/uploads/2018/07/fire-png-6.png?resize=859,1024&ssl=1",
+        Coin(_) => img_display = "https://webstockreview.net/images/coin-clipart-fandom-7.png",
+        Bin(_) => img_display = "https://purepng.com/public/uploads/large/purepng.com-trash-cantrash-cansteelplasticdustbinrecyclebin-1421526645886ziucf.png",
+        Crate(_) => img_display = "https://www.textures4photoshop.com/tex/thumbs/wooden-box-PNG-free-thumb19.png",
+        Bank(_) => img_display = "https://pngimg.com/uploads/bank/bank_PNG24.png",
+        Water(_) => img_display = "https://pngimg.com/uploads/water/water_PNG3290.png",
+        Market(_) => img_display = "https://static.vecteezy.com/system/resources/previews/013/822/272/original/3d-illustration-store-market-png.png",
+        Fish(_) => img_display = "https://www.freeiconspng.com/uploads/fish-png-4.png",
+        Building => img_display = "https://www.pngmart.com/files/21/3D-Building-PNG-Pic.png",
+        Bush(_) => img_display = "https://pluspng.com/img-png/bush-png-bush-png-image-1024.png",
+        JollyBlock(_) => img_display = "https://www.tynker.com/minecraft/editor/block/diamond_block/5cc07b98cebfbd1c2154195a/?image=true",
+        Scarecrow => img_display = "https://clipground.com/images/scarecrow-png.png",
+        Content::None => img_display = "https://www.freeiconspng.com/uploads/no-image-icon-11.PNG",        
+}
+        
 
-        _ => img_display = "ERR",
-    }
+        // _ => img_display = "ERR",
+    
     html! {
-        <img class={classes!("tile")} src={img_display}/>
+        <img class={classes!("tile_content")} src={img_display}/>
     }
 }
