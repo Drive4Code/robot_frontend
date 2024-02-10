@@ -1,0 +1,13 @@
+.tile {
+    height: 250px;
+    width: 250px;
+}
+
+#robot_view {
+    float: right;
+}
+
+#backpack {
+    float: left;
+    width: 200px;
+}
