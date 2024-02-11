@@ -12,7 +12,7 @@ fn app() -> Html {
     html! {
         <>
         <BounceRoot>
-            <h1>{ "Robot Pripiat" }</h1>
+            // <h1>{ "Robot" }</h1>
             <Main/>
             <ActivateAi/>
         </BounceRoot>
