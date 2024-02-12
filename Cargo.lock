@@ -448,7 +448,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "frontend_wasm"
+name = "frontend-wasm"
 version = "0.2.0"
 dependencies = [
  "bincode",
