@@ -1,21 +1,36 @@
 <!DOCTYPE html><html><head>
         <meta charset="utf-8">
-        <link rel="stylesheet" href="/main-e9667fb7d2304a85.css" integrity="sha384-ZVENEnLgkYhwn0i18zNfgys6xliprsJtURhlG4NpJDH3V-0OohGz1hNweqd8DOQZ">
+        <link rel="stylesheet" href="/main-f6f5ece712ff319b.css" integrity="sha384-HBxyP87A5OICSy3aA0sqyCqXB2hzRZaZUtTs3AVckDUx2dxBHfqfmCnh5jz5-tMa">
         <title>Yew App</title>
     
-<link rel="preload" href="/frontend-wasm-a8e2863f33bc4b40_bg.wasm" as="fetch" type="application/wasm" crossorigin="anonymous" integrity="sha384-mlcCVWy0QVlAkN-6oUt6L0LlMYX3ICRtUj3H4LQBE67FaYx27PgBiffKgHAkTmhO">
-<link rel="modulepreload" href="/frontend-wasm-a8e2863f33bc4b40.js" crossorigin="anonymous" integrity="sha384-2WLQFCa2ld-EABEsDQHGzMyTporX0c3KrO60aWrcePwjAOIIsiLIIkQf-FB6Wghi"></head>
+<link rel="preload" href="/frontend-wasm-30addd69f3df39d1_bg.wasm" as="fetch" type="application/wasm" crossorigin="anonymous" integrity="sha384-01fqnCpzNvDwJEoODdZi6a1RbecEm0tm50hiHHJtBTw2XjZsRBMJCcKYnwjVHLD4">
+<link rel="modulepreload" href="/frontend-wasm-30addd69f3df39d1.js" crossorigin="anonymous" integrity="sha384-_-JzTsS17gzute0j4FXOVPKkfTnztwoV1x3kUzzRLnHuaMlHkAFfbTS_5ODaLFcg">
+<link rel="modulepreload" href="/snippets/frontend-wasm-2227caa90b933139/src/file_reader.js" crossorigin="anonymous" integrity="sha384-BbUUo34Bb21p6mqNB_So94KYLEyNLQ2AzahspdO9vxntp-h8tW_UHgoxoq_5n-cI"></head>
     <body>
         <main id="app"></main>
         <script type="module">
-            import init, { run_app } from './pkg/frontend_wasm.js';
+            import init, { run_app, load_as_grid_from_js } from './pkg/frontend_wasm.js';
             init('/pkg/frontend_wasm_bg.wasm').then(run_app);
+    
+            async function run() {
+                await init('/pkg/frontend_wasm_bg.wasm'); // Initialize your WASM module
+    
+                // Assuming you know the exact path and it's accessible via HTTP request
+                // For local files, you'd need the user to select the file or drag and drop
+                const response = await fetch('/path/to/your/file.bin');
+                const bytes = await response.arrayBuffer();
+    
+                load_as_grid_from_js(new Uint8Array(bytes));
+                run_app
+            }
+    
+            run().catch(console.error);
         </script>
     
 
 <script type="module">
-import init, * as bindings from '/frontend-wasm-a8e2863f33bc4b40.js';
-init('/frontend-wasm-a8e2863f33bc4b40_bg.wasm');
+import init, * as bindings from '/frontend-wasm-30addd69f3df39d1.js';
+init('/frontend-wasm-30addd69f3df39d1_bg.wasm');
 window.wasmBindings = bindings;
 
 </script><script>"use strict";

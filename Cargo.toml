@@ -19,7 +19,7 @@ lazy_static = "1.4.0"
 rand = { version = "0.8.5", features = [] }
 strum = "0.26.1"
 strum_macros = { version = "0.26.1", features = [] }
-serde = { version = "1.0.193", features = ["derive"] }
+serde = { version = "1.0.193", features = ["serde_derive"] }
 
 # "client" = {path="../robot_web_python/client_example"}
 # tungstenite = "0.21"
@@ -39,3 +39,13 @@ yew-agent = "0.3"
 yewdux = "0.10"
 bounce = "0.9.0"
 gloo-timers = "0.3"
+
+
+# Custom Worldgen Dependencies
+egui = "0.24.0"
+egui_extras = { version = "0.24.0", features = ["all_loaders"] }
+serde-binary = "0.5.0"
+serde-wasm-bindgen = "0.6.3"
+wasm-bindgen-futures = "0.4" 
+bincode = "1.3.3"
+js-sys = "0.3"

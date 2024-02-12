@@ -24,6 +24,7 @@ use strum::IntoEnumIterator;
 
 // extern crate worldgen_unwrap;
 // use worldgen_unwrap::public::*;
+include!("worldloader.rs");
 use std::path::PathBuf;
 
 // Frontend
@@ -305,8 +306,11 @@ pub fn ai() -> Html {
                     println!("HERE {:?}", teleport(self, world, (1, 1)));
                     // Update UI State
                     let worldStatus = self.2.clone();
+                    let tmpMap = robotics_lib::interface::robot_map(world).unwrap_or_default();
+                    let msg = JsValue::from(format!("TEST {:?}", tmpMap));
+                    info!("{}", msg.as_string().unwrap());
                     worldStatus.set(WorldState {
-                        world: robotics_lib::interface::robot_map(world).unwrap_or_default(),
+                        world: tmpMap,
                         enviromentalConditions: worldStatus.enviromentalConditions.clone(),
                     });
                 }
@@ -332,15 +336,9 @@ pub fn ai() -> Html {
                                 content: newInside,
                             });
                         }
-                        Event::Moved(newTile, (coord1, coord2)) => {
-                            let msg = JsValue::from(format!("Coords: {:?}", self.get_coordinate()));
-                            info!("{}", msg.as_string().unwrap());
-                            let robotStatus = self.3.clone();
-                            robotStatus.set(RobotState {
-                                coord: (coord1, coord2),
-                                energy: robotStatus.energy
-                            });
-                        }
+                        // Event::Moved(newTile, (coord1, coord2)) => {
+                            
+                        // }
                         // Event::Ready => todo!(),
                         // Event::Terminated => todo!(),
                         Event::TimeChanged(newEnviromentalConds) => {
@@ -403,19 +401,23 @@ pub fn ai() -> Html {
             );
             struct Tool;
             impl Tools for Tool {}
-            let mut generator = WorldGenerator::init(4);
-            // let mut generator = WorldgeneratorUnwrap::init(false, Some(PathBuf::from("world.bin")));
+            // let mut generator = WorldGenerator::init(4);
+            let mut generator = WorldgeneratorUnwrap::init(false, Some(PathBuf::from("world.bin")));
             let run = Runner::new(Box::new(r), &mut generator);
             //Known bug: 'check_world' inside 'Runner::new()' fails every time
             println!("AO");
-            *timeout_handle.borrow_mut() = Some(Timeout::new(1000, move || {
+            *timeout_handle.borrow_mut() = Some(Timeout::new(10000, move || {
                 message.set("Placeholder".to_string());
                 match run {
                     Ok(mut r) => {
                         for _ in 0..1000 {
                             let _ = r.game_tick();
-                            let coord = r.get_robot().get_coordinate();
-                            let msg = JsValue::from(format!("Coords: {:?}", coord));
+                            let tmpCoords = r.get_robot().get_coordinate();
+                            let msg = JsValue::from(format!("Coords: {:?} Robot inside coords: {:?}", tmpCoords, robotState.coord));
+                            robotState.set(RobotState {
+                                coord: (tmpCoords.get_row(), tmpCoords.get_col()),
+                                energy: robotState.energy.clone()
+                            });
                             info!("{}", msg.as_string().unwrap());
                             // robotics_lib::interface::
                         }
@@ -546,7 +548,7 @@ pub fn map_tile_content(props: &MapTileProps) -> Html {
         html! {<></>}
     } else {
         html! {
-            <img class={classes!("tile_content")} src={img_display}/>
+            <img  class={classes!("tile_content")} src={img_display}/>
         }
     }
     

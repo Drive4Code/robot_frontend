@@ -46,6 +46,10 @@
     width: 75px;
 }
 
+.tile_type {
+  height: 100%;
+  object-fit: cover;
+}
 
 /* Looks */
 /* General styles */
@@ -104,8 +108,12 @@ body {
   position: absolute;
   top: 0;
   left: 0;
-  width: 70%;
+  width: 100%;
   height: 100%;
+}
+
+.tile_content img {
+    width: 1px;
 }
 
 /* Backpack styles */
@@ -119,10 +127,6 @@ body {
   align-items: center;
   overflow-x: auto;
   white-space: nowrap;
-}
-
-#backpack h2 {
-  display: none; /* Hide the title for more space */
 }
 
 .back_item {
@@ -140,25 +144,6 @@ body {
   margin: 0;
   color: #333;
   margin-left: 5px;
-}
-
-/* Utility classes */
-.tile_type {
-  height: 100%;
-  object-fit: cover;
-}
-
-/* Responsive design */
-@media (max-width: 768px) {
-  #robot_view {
-    width: 100%;
-    max-width: none;
-    margin: 20px 0;
-  }
-
-  #backpack {
-    justify-content: center;
-  }
 }
 
 /* Footer styles */
