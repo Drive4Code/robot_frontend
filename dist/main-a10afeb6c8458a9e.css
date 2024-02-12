@@ -1,0 +1,150 @@
+.tile img {
+    height: 5px;
+    width: 5px;
+}
+/* Relative position */
+.tile {
+    position: relative;
+}
+
+#robot {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 1;
+    width: 70px;
+    height: 70px;
+}
+
+#robot_view {
+    float: bottom;
+    display: flex;
+    list-style: none;
+    align-content: center;
+    align-items: center;
+    justify-content: center;
+}
+
+#robot_view img {
+    width: 25px;
+    height: 25px;
+}
+
+/* #backpack {
+    float: left;
+    display: flex;
+    width: 600px;
+    text-align: center;
+} */
+
+#backpack img {
+    height: 75px;
+    width: 75px;
+}
+
+.tile_type {
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Looks */
+/* General styles */
+body {
+  font-family: 'Arial', sans-serif;
+  background-color: #f0f0f0;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* Map view styles */
+#robot_view {
+  align-items: center;
+  padding: 20px;
+  background-color: #fff;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  margin: 20px;
+  overflow: auto;
+}
+
+.map_row {
+  display: flex;
+  flex-direction: column;
+}
+
+.tile {
+  position: relative;
+  overflow: hidden;
+  margin: 0; /* Remove spacing between tiles */
+  border: none; /* Remove border */
+}
+
+.tile img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+#robot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1;
+  width: 50px;
+  height: 50px;
+}
+
+.tile_content {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.tile_content img {
+    width: 1px;
+}
+
+/* Backpack styles */
+#backpack {
+  background-color: #fff;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  margin: 20px;
+  display: flex;
+  align-items: center;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.back_item {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 10px;
+}
+
+.back_item img {
+  height: 75px;
+  width: 75px;
+}
+
+.back_item h3 {
+  margin: 0;
+  color: #333;
+  margin-left: 5px;
+}
+
+/* Footer styles */
+footer {
+  padding: 10px;
+  text-align: center;
+  background-color: #333;
+  color: #fff;
+}

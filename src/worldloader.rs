@@ -5,14 +5,6 @@ use egui::Color32;
 use serde::{Deserialize, Serialize};
 // use std::collections::HashMap;
 // use std::path::PathBuf;
-use js_sys::Uint8Array;
-use wasm_bindgen::prelude::*;
-use wasm_bindgen::JsCast;
-// use wasm_bindgen::JsValue;
-use wasm_bindgen_futures::JsFuture;
-use wasm_bindgen::UnwrapThrowExt;
-
-use wasm_bindgen::prelude::*;
 
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -60,26 +52,11 @@ impl Grid {
     }
 }
 
-#[wasm_bindgen(module = "/src/file_reader.js")]
-extern "C" {
-    #[wasm_bindgen(catch)]
-    pub fn read_file(path: String) -> Result<Uint8Array, JsValue>;
-    // pub fn read_file(path: String) -> Result<Uint8Array, JsValue>; JsFuture
-}
-
-const WORLD_DATA: &'static [u8] = include_bytes!("world.bin");
+const WORLD_DATA: &'static [u8] = include_bytes!("assets/world2.bin");
 
 pub(crate) fn load_as_grid(grid: &mut Grid, path: PathBuf) {
-    // let uint8_array = match read_file(path.into_os_string().into_string().expect("NAPULE NAVVENTURA")) {
-    //     Ok(array) => array,
-    //     Err(_) => panic!("Failed to read file."),
-    // };
-    let msg = JsValue::from(format!("TEST {:?}", WORLD_DATA));
-    info!("{}", msg.as_string().unwrap());
-    // let bytes = Uint8Array::to_vec(&uint8_array);
-    // let msg = JsValue::from(format!("TEST {:?}", bytes));
+    // let msg = JsValue::from(format!("LOADER {:?}", WORLD_DATA));
     // info!("{}", msg.as_string().unwrap());
-    // let sliced = bytes.as_slice();
     let deserialized: Grid = bincode::deserialize(WORLD_DATA)
         .expect("Failed to read file. The file is not in the correct format. The only way to create a world is with the gui, maybe you tried doing it manually or you tried to load the wrong file.");
     *grid = deserialized;

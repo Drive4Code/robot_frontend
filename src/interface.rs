@@ -1,8 +1,7 @@
 // Project imports
-use rand::Rng;
 use robotics_lib::energy::Energy;
 use robotics_lib::event::events::{self, Event};
-use robotics_lib::interface::{craft, debug, destroy, go, look_at_sky, teleport, Direction};
+use robotics_lib::interface::{craft, debug, destroy, go, look_at_sky, robot_map, teleport, Direction};
 use robotics_lib::interface::{robot_view, Tools};
 use robotics_lib::runner::backpack::{self, BackPack};
 use robotics_lib::runner::{Robot, Runnable, Runner};
@@ -17,10 +16,8 @@ use robotics_lib::world::tile::TileType::{
     DeepWater, Grass, Hill, Lava, Mountain, Sand, ShallowWater, Snow, Street, Teleport,
 };
 use robotics_lib::world::tile::{Content, Tile, TileType};
-use robotics_lib::world::world_generator::Generator;
 use robotics_lib::world::World;
 use std::collections::HashMap;
-use strum::IntoEnumIterator;
 
 // extern crate worldgen_unwrap;
 // use worldgen_unwrap::public::*;
@@ -35,7 +32,7 @@ use bounce::*;
 use gloo_timers::callback::Timeout;
 use std::cell::RefCell;
 use std::rc::Rc;
-use yew_agent::oneshot::{use_oneshot_runner, OneshotProvider};
+// use yew_agent::oneshot::{use_oneshot_runner, OneshotProvider};
 use yewdux::prelude::*;
 
 use log::info;
@@ -149,79 +146,6 @@ pub fn ai() -> Html {
                 UseAtomHandle<WorldState>,
                 UseAtomHandle<RobotState>,
             );
-            struct WorldGenerator {
-                size: usize,
-            }
-            impl WorldGenerator {
-                fn init(size: usize) -> Self {
-                    WorldGenerator { size }
-                }
-            }
-            impl Generator for WorldGenerator {
-                fn gen(
-                    &mut self,
-                ) -> (
-                    Vec<Vec<Tile>>,
-                    (usize, usize),
-                    EnvironmentalConditions,
-                    f32,
-                    Option<HashMap<Content, f32>>,
-                ) {
-                    let mut rng = rand::thread_rng();
-                    let mut map: Vec<Vec<Tile>> = Vec::new();
-                    // Initialize the map with default tiles
-                    for _ in 0..self.size {
-                        let mut row: Vec<Tile> = Vec::new();
-                        for _ in 0..self.size {
-                            let i_tiletype = rng.gen_range(0..TileType::iter().len());
-                            let i_content = rng.gen_range(0..Content::iter().len());
-                            let tile_type = match i_tiletype {
-                                0 => DeepWater,
-                                1 => ShallowWater,
-                                2 => Sand,
-                                3 => Grass,
-                                4 => Street,
-                                5 => Hill,
-                                6 => Mountain,
-                                7 => Snow,
-                                8 => Lava,
-                                9 => Teleport(false),
-                                _ => Grass,
-                            };
-                            let content = match i_content {
-                                0 => Rock(0),
-                                1 => Tree(2),
-                                2 => Garbage(2),
-                                3 => Fire,
-                                4 => Coin(2),
-                                5 => Bin(2..3),
-                                6 => Crate(2..3),
-                                7 => Bank(3..54),
-                                8 => Water(20),
-                                10 => Fish(3),
-                                11 => Market(20),
-                                12 => Building,
-                                13 => Bush(2),
-                                14 => JollyBlock(2),
-                                15 => Scarecrow,
-                                _ => Content::None,
-                            };
-                            row.push(Tile {
-                                tile_type,
-                                content,
-                                elevation: 0,
-                            });
-                        }
-                        map.push(row);
-                    }
-                    let environmental_conditions =
-                        EnvironmentalConditions::new(&[Sunny, Rainy], 15, 12).unwrap();
-
-                    let max_score = rand::random::<f32>();
-
-                    (map, (0, 0), environmental_conditions, max_score, None)
-                }
-            }
 
             impl Runnable for MyRobot {
                 fn process_tick(&mut self, world: &mut World) {
@@ -306,7 +230,8 @@ pub fn ai() -> Html {
                     println!("HERE {:?}", teleport(self, world, (1, 1)));
                     // Update UI State
                     let worldStatus = self.2.clone();
-                    let tmpMap = robotics_lib::interface::robot_map(world).unwrap_or_default();
+                    // robotics_lib::interface::
+                    let tmpMap = robot_map(&world).unwrap_or_default();
                     let msg = JsValue::from(format!("TEST {:?}", tmpMap));
                     info!("{}", msg.as_string().unwrap());
                     worldStatus.set(WorldState {
@@ -410,7 +335,7 @@ pub fn ai() -> Html {
                 message.set("Placeholder".to_string());
                 match run {
                     Ok(mut r) => {
-                        for _ in 0..1000 {
+                        for _ in 0..100 {
                             let _ = r.game_tick();
                             let tmpCoords = r.get_robot().get_coordinate();
                             let msg = JsValue::from(format!("Coords: {:?} Robot inside coords: {:?}", tmpCoords, robotState.coord));

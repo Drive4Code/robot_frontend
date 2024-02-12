@@ -1,6 +1,6 @@
 .tile img {
-    height: 125px;
-    width: 125px;
+    height: 5px;
+    width: 5px;
 }
 /* Relative position */
 .tile {
@@ -17,9 +17,6 @@
     height: 70px;
 }
 
-  
-
-
 #robot_view {
     float: bottom;
     display: flex;
@@ -30,8 +27,8 @@
 }
 
 #robot_view img {
-    width: 100px;
-    height:100px;
+    width: 25px;
+    height: 25px;
 }
 
 /* #backpack {
@@ -65,9 +62,6 @@ body {
 
 /* Map view styles */
 #robot_view {
-  flex-grow: 1;
-  display: flex;
-  flex-direction: column;
   align-items: center;
   padding: 20px;
   background-color: #fff;
@@ -79,6 +73,7 @@ body {
 
 .map_row {
   display: flex;
+  flex-direction: column;
 }
 
 .tile {
