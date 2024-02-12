@@ -2,7 +2,7 @@
 use robotics_lib::energy::Energy;
 use robotics_lib::event::events::{self, Event};
 use robotics_lib::interface::{craft, debug, destroy, go, look_at_sky, robot_map, teleport, Direction};
-use robotics_lib::interface::{robot_view, Tools};
+use robotics_lib::interface::{Tools};
 use robotics_lib::runner::backpack::{self, BackPack};
 use robotics_lib::runner::{Robot, Runnable, Runner};
 use robotics_lib::world::coordinates::Coordinate;
@@ -37,6 +37,8 @@ use yewdux::prelude::*;
 
 use log::info;
 use wasm_bindgen::JsValue;
+
+
 
 // enums to allow updates inside the impl
 #[derive(Clone, PartialEq, Store, Atom)]
@@ -99,9 +101,11 @@ pub fn main() -> Html {
         html! {
             <div id="info">
                 { if &startAi.0 == &true {
-                    html! {<Ai/>}
+                    // html! {<Ai/>}
+                    html! {<TimoAi/>}
+                    // html! {<></>}
                 } else {
-                    html! {}
+                    html! {<></>}
                 }
                 }
 
@@ -498,4 +502,243 @@ fn contentMatch(input: &Content) -> String {
         Scarecrow => return "https://lh3.googleusercontent.com/Wa9r8of1_KTeOtj5wEfDgRxUM2cq3MqrCVdUYkQy8D2hCtNZnuAFdJ1fF8D6lgpQRkRgLkkN8H1Yjnsr-oDclQ=s400".to_string(),
         Content::None => return "".to_string(),        
 }
+}
+
+
+
+
+
+// TIMO CODE BLYAT
+#[function_component(TimoAi)]
+pub fn timo_ai() -> Html {
+    // USESTATES
+    let backState = use_atom::<BackpackState>();
+    let worldState = use_atom::<WorldState>();
+    let robotState = use_atom::<RobotState>();
+
+    let msg = JsValue::from(format!("Ai Running"));
+    info!("{}", msg.as_string().unwrap());
+    let message = use_state(|| "Waiting...".to_string());
+    let timeout_handle = use_mut_ref(|| None::<Timeout>);
+    {
+        let message = message.clone();
+        use_effect(move || {
+            // Setup world
+            struct MyRobot(
+                Robot,
+                UseAtomHandle<BackpackState>,
+                UseAtomHandle<WorldState>,
+                UseAtomHandle<RobotState>,
+            );
+
+            impl Runnable for MyRobot {
+                fn process_tick(&mut self, world: &mut World) {
+                    for _ in 0..1 {
+                        let (tmp, a, b) = debug(self, world);
+                        let environmental_conditions = look_at_sky(world);
+                        println!(
+                            "Daytime: {:?}, Time:{:?}, Weather: {:?}\n",
+                            environmental_conditions.get_time_of_day(),
+                            environmental_conditions.get_time_of_day_string(),
+                            environmental_conditions.get_weather_condition()
+                        );
+                        for elem in tmp.iter() {
+                            for tile in elem.iter() {
+                                match tile.tile_type {
+                                    DeepWater => {
+                                        print!("DW");
+                                    }
+                                    ShallowWater => {
+                                        print!("SW");
+                                    }
+                                    Sand => {
+                                        print!("Sa");
+                                    }
+                                    Grass => {
+                                        print!("Gr");
+                                    }
+                                    Street => {
+                                        print!("St");
+                                    }
+                                    Hill => {
+                                        print!("Hi");
+                                    }
+                                    Mountain => {
+                                        print!("Mt");
+                                    }
+                                    Snow => {
+                                        print!("Sn");
+                                    }
+                                    Lava => {
+                                        print!("La");
+                                    }
+                                    Teleport(_) => {
+                                        print!("Tl");
+                                    }
+                                    TileType::Wall => {
+                                        print!("Wl");
+                                    }
+                                }
+                                match &tile.content {
+                                    Rock(quantity) => print!("->Ro {}", quantity),
+                                    Tree(quantity) => print!("->Tr {}", quantity),
+                                    Garbage(quantity) => print!("->Gr {}", quantity),
+                                    Fire => print!("->Fi -"),
+                                    Coin(quantity) => print!("->Co {}", quantity),
+                                    Bin(range) => print!("->Bi {}-{}", range.start, range.end),
+                                    Crate(range) => print!("->Cr {}-{}", range.start, range.end),
+                                    Bank(range) => print!("->Ba {}-{}", range.start, range.end),
+                                    Water(quantity) => print!("->Wa {}", quantity),
+                                    Content::None => print!("->No -"),
+                                    Fish(quantity) => print!("->Fh {}", quantity),
+                                    Market(quantity) => print!("->Mk {}", quantity),
+                                    Building => print!("->Bui -"),
+                                    Bush(quantity) => print!("->Bu {}", quantity),
+                                    JollyBlock(quantity) => print!("->Jo {}", quantity),
+                                    Scarecrow => print!("->Sc -"),
+                                }
+                                print!("\t| ");
+                            }
+                            println!();
+                        }
+                        println!("{:?}, {:?}", a, b);
+                        // match ris {
+                        //     | Ok(values) => println!("Ok"),
+                        //     | Err(e) => println!("{:?}", e),
+                        // }
+                    }
+                    println!("HERE {:?}", destroy(self, world, Direction::Down));
+                    let _ = go(self, world, Direction::Down);
+                    println!("CRAFT: {:?}", craft(self, Content::Garbage(0)));
+                    println!("\n\nBACKPACK: {:?}\n\n", self.get_backpack());
+                    println!("HERE {:?}", teleport(self, world, (1, 1)));
+                    // Update UI State
+                    let worldStatus = self.2.clone();
+                    // robotics_lib::interface::
+                    let tmpMap = robot_map(&world).unwrap_or_default();
+                    let msg = JsValue::from(format!("TEST {:?}", tmpMap));
+                    info!("{}", msg.as_string().unwrap());
+                    worldStatus.set(WorldState {
+                        world: tmpMap,
+                        enviromentalConditions: worldStatus.enviromentalConditions.clone(),
+                    });
+                }
+
+                fn handle_event(&mut self, event: Event) {
+                    println!();
+                    println!("{:?}", event);
+                    // Logs the event to the console
+                    let msg = JsValue::from(format!("{:?}", event));
+                    info!("{}", msg.as_string().unwrap());
+                    // Backpack Updates
+                    let backStatus = self.1.clone();
+                    match event {
+                        Event::AddedToBackpack(_, _) | Event::RemovedFromBackpack(_, _) => {
+                            let newBack = self.get_backpack();
+                            let newBackContent = newBack.get_contents();
+                            let newInside: HashMap<Content, usize> = (newBackContent.iter())
+                                .map(|content| (content.0.to_owned(), content.1.to_owned()))
+                                .collect();
+                            // HERE Implement the code to update a state inside the ai function component with the value of backpack size and content
+                            backStatus.set(BackpackState {
+                                size: newBack.get_size(),
+                                content: newInside,
+                            });
+                        }
+                        // Event::Moved(newTile, (coord1, coord2)) => {
+                            
+                        // }
+                        // Event::Ready => todo!(),
+                        // Event::Terminated => todo!(),
+                        Event::TimeChanged(newEnviromentalConds) => {
+                            let worldStatus = self.2.clone();
+                            worldStatus.set(WorldState { world: worldStatus.world.clone(), enviromentalConditions: newEnviromentalConds })
+                        },
+                        Event::DayChanged(newEnviromentalConds) => {
+                            let worldStatus = self.2.clone();
+                            worldStatus.set(WorldState { world: worldStatus.world.clone(), enviromentalConditions: newEnviromentalConds })
+                        },
+                        Event::EnergyRecharged(_) => {
+                            let robotStatus = self.3.clone();
+                            robotStatus.set(RobotState {coord: robotStatus.coord, energy: self.get_energy().get_energy_level()});
+                        },
+                        Event::EnergyConsumed(_) => {
+                            let robotStatus = self.3.clone();
+                            robotStatus.set(RobotState {coord: robotStatus.coord, energy: self.get_energy().get_energy_level()});
+                        },
+                        Event::TileContentUpdated(_, _) => {
+                            let msg = JsValue::from(format!(
+                                "Updated Coords: {:?}",
+                                self.get_coordinate()
+                            ));
+                            info!("{}", msg.as_string().unwrap());
+                        }
+                        _ => println!("Before"),
+                    };
+
+                    println!();
+                }
+
+                fn get_energy(&self) -> &Energy {
+                    &self.0.energy
+                }
+                fn get_energy_mut(&mut self) -> &mut Energy {
+                    &mut self.0.energy
+                }
+
+                fn get_coordinate(&self) -> &Coordinate {
+                    &self.0.coordinate
+                }
+                fn get_coordinate_mut(&mut self) -> &mut Coordinate {
+                    &mut self.0.coordinate
+                }
+
+                fn get_backpack(&self) -> &BackPack {
+                    &self.0.backpack
+                }
+                fn get_backpack_mut(&mut self) -> &mut BackPack {
+                    &mut self.0.backpack
+                }
+            }
+
+            // RUNNING THE GAME
+            let r = MyRobot(
+                Robot::new(),
+                backState.clone(),
+                worldState.clone(),
+                robotState.clone(),
+            );
+            struct Tool;
+            impl Tools for Tool {}
+            // let mut generator = WorldGenerator::init(4);
+            let mut generator = WorldgeneratorUnwrap::init(false, Some(PathBuf::from("world.bin")));
+            let run = Runner::new(Box::new(r), &mut generator);
+            //Known bug: 'check_world' inside 'Runner::new()' fails every time
+            println!("AO");
+            *timeout_handle.borrow_mut() = Some(Timeout::new(10000, move || {
+                message.set("Placeholder".to_string());
+                match run {
+                    Ok(mut r) => {
+                        for _ in 0..100 {
+                            let _ = r.game_tick();
+                            let tmpCoords = r.get_robot().get_coordinate();
+                            let msg = JsValue::from(format!("Coords: {:?} Robot inside coords: {:?}", tmpCoords, robotState.coord));
+                            robotState.set(RobotState {
+                                coord: (tmpCoords.get_row(), tmpCoords.get_col()),
+                                energy: robotState.energy.clone()
+                            });
+                            info!("{}", msg.as_string().unwrap());
+                            // robotics_lib::interface::
+                        }
+                    }
+                    Err(e) => println!("{:?}", e),
+                }
+            }));
+
+            || println!("Done!")
+        });
+    }
+    html! {
+        <></>
+    }
 }

@@ -2,7 +2,7 @@
 use yew::prelude::*;
 use wasm_bindgen::prelude::*;
 use bounce::BounceRoot;
-mod interface;
+pub mod interface;
 use interface::{Main, ActivateAi};
 
 #[function_component(App)]
