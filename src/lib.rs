@@ -3,6 +3,12 @@ use yew::prelude::*;
 use wasm_bindgen::prelude::*;
 use bounce::BounceRoot;
 pub mod interface;
+pub mod biomes;
+pub mod explorer;
+pub mod morans_i;
+pub mod utils;
+pub mod sector_analyzer;
+
 use interface::{Main, ActivateAi};
 
 #[function_component(App)]

@@ -1,3 +1,5 @@
+use charting_tools::ChartingTools;
+use ohcrab_weather::weather_tool::WeatherPredictionTool;
 // Project imports
 use robotics_lib::energy::Energy;
 use robotics_lib::event::events::{self, Event};
@@ -17,7 +19,9 @@ use robotics_lib::world::tile::TileType::{
 };
 use robotics_lib::world::tile::{Content, Tile, TileType};
 use robotics_lib::world::World;
-use std::collections::HashMap;
+use rust_eze_tomtom::TomTom;
+use vent_tool_ascii_crab::Vent;
+use std::collections::{HashMap, HashSet, VecDeque};
 
 // extern crate worldgen_unwrap;
 // use worldgen_unwrap::public::*;
@@ -37,6 +41,10 @@ use yewdux::prelude::*;
 
 use log::info;
 use wasm_bindgen::JsValue;
+
+use crate::explorer::new_explorer;
+use crate::utils::{calculate_spatial_index, execute_mission, get_world_dimension, ActiveRegion, Mission};
+use rust_and_furious_dynamo::dynamo::Dynamo;
 
 
 
@@ -524,96 +532,34 @@ pub fn timo_ai() -> Html {
         let message = message.clone();
         use_effect(move || {
             // Setup world
-            struct MyRobot(
-                Robot,
-                UseAtomHandle<BackpackState>,
-                UseAtomHandle<WorldState>,
-                UseAtomHandle<RobotState>,
-            );
+            struct Jerry{
+                robot: Robot,
+                bps: UseAtomHandle<BackpackState>,
+                ws: UseAtomHandle<WorldState>,
+                rs: UseAtomHandle<RobotState>,
+                tick_counter: usize,
+                world_dim: usize,
+                active_region: ActiveRegion,
+                road_tiles: HashSet<Coordinate>,
+                vent: Rc<RefCell<Vent>>,
+                dynamo: Dynamo,
+                weather_predictor: WeatherPredictionTool,
+                tom_tom: TomTom,
+                charting_tools: ChartingTools,
+                missions: VecDeque<Mission>
+            };
 
-            impl Runnable for MyRobot {
+            impl Runnable for Jerry {
                 fn process_tick(&mut self, world: &mut World) {
-                    for _ in 0..1 {
-                        let (tmp, a, b) = debug(self, world);
-                        let environmental_conditions = look_at_sky(world);
-                        println!(
-                            "Daytime: {:?}, Time:{:?}, Weather: {:?}\n",
-                            environmental_conditions.get_time_of_day(),
-                            environmental_conditions.get_time_of_day_string(),
-                            environmental_conditions.get_weather_condition()
-                        );
-                        for elem in tmp.iter() {
-                            for tile in elem.iter() {
-                                match tile.tile_type {
-                                    DeepWater => {
-                                        print!("DW");
-                                    }
-                                    ShallowWater => {
-                                        print!("SW");
-                                    }
-                                    Sand => {
-                                        print!("Sa");
-                                    }
-                                    Grass => {
-                                        print!("Gr");
-                                    }
-                                    Street => {
-                                        print!("St");
-                                    }
-                                    Hill => {
-                                        print!("Hi");
-                                    }
-                                    Mountain => {
-                                        print!("Mt");
-                                    }
-                                    Snow => {
-                                        print!("Sn");
-                                    }
-                                    Lava => {
-                                        print!("La");
-                                    }
-                                    Teleport(_) => {
-                                        print!("Tl");
-                                    }
-                                    TileType::Wall => {
-                                        print!("Wl");
-                                    }
-                                }
-                                match &tile.content {
-                                    Rock(quantity) => print!("->Ro {}", quantity),
-                                    Tree(quantity) => print!("->Tr {}", quantity),
-                                    Garbage(quantity) => print!("->Gr {}", quantity),
-                                    Fire => print!("->Fi -"),
-                                    Coin(quantity) => print!("->Co {}", quantity),
-                                    Bin(range) => print!("->Bi {}-{}", range.start, range.end),
-                                    Crate(range) => print!("->Cr {}-{}", range.start, range.end),
-                                    Bank(range) => print!("->Ba {}-{}", range.start, range.end),
-                                    Water(quantity) => print!("->Wa {}", quantity),
-                                    Content::None => print!("->No -"),
-                                    Fish(quantity) => print!("->Fh {}", quantity),
-                                    Market(quantity) => print!("->Mk {}", quantity),
-                                    Building => print!("->Bui -"),
-                                    Bush(quantity) => print!("->Bu {}", quantity),
-                                    JollyBlock(quantity) => print!("->Jo {}", quantity),
-                                    Scarecrow => print!("->Sc -"),
-                                }
-                                print!("\t| ");
-                            }
-                            println!();
-                        }
-                        println!("{:?}, {:?}", a, b);
-                        // match ris {
-                        //     | Ok(values) => println!("Ok"),
-                        //     | Err(e) => println!("{:?}", e),
-                        // }
+                    if self.tick_counter == 0{
+                        first_tick(self, world);
                     }
-                    println!("HERE {:?}", destroy(self, world, Direction::Down));
-                    let _ = go(self, world, Direction::Down);
-                    println!("CRAFT: {:?}", craft(self, Content::Garbage(0)));
-                    println!("\n\nBACKPACK: {:?}\n\n", self.get_backpack());
-                    println!("HERE {:?}", teleport(self, world, (1, 1)));
+                    execute_mission( self, world);
+                    println!("{:?} {}", self.robot.energy, self.tick_counter);
+                    self.tick_counter += 1;
+                    
                     // Update UI State
-                    let worldStatus = self.2.clone();
+                    let worldStatus = self.ws.clone();
                     // robotics_lib::interface::
                     let tmpMap = robot_map(&world).unwrap_or_default();
                     let msg = JsValue::from(format!("TEST {:?}", tmpMap));
@@ -631,7 +577,7 @@ pub fn timo_ai() -> Html {
                     let msg = JsValue::from(format!("{:?}", event));
                     info!("{}", msg.as_string().unwrap());
                     // Backpack Updates
-                    let backStatus = self.1.clone();
+                    let backStatus = self.bps.clone();
                     match event {
                         Event::AddedToBackpack(_, _) | Event::RemovedFromBackpack(_, _) => {
                             let newBack = self.get_backpack();
@@ -651,19 +597,19 @@ pub fn timo_ai() -> Html {
                         // Event::Ready => todo!(),
                         // Event::Terminated => todo!(),
                         Event::TimeChanged(newEnviromentalConds) => {
-                            let worldStatus = self.2.clone();
+                            let worldStatus = self.ws.clone();
                             worldStatus.set(WorldState { world: worldStatus.world.clone(), enviromentalConditions: newEnviromentalConds })
                         },
                         Event::DayChanged(newEnviromentalConds) => {
-                            let worldStatus = self.2.clone();
+                            let worldStatus = self.ws.clone();
                             worldStatus.set(WorldState { world: worldStatus.world.clone(), enviromentalConditions: newEnviromentalConds })
                         },
                         Event::EnergyRecharged(_) => {
-                            let robotStatus = self.3.clone();
+                            let robotStatus = self.rs.clone();
                             robotStatus.set(RobotState {coord: robotStatus.coord, energy: self.get_energy().get_energy_level()});
                         },
                         Event::EnergyConsumed(_) => {
-                            let robotStatus = self.3.clone();
+                            let robotStatus = self.rs.clone();
                             robotStatus.set(RobotState {coord: robotStatus.coord, energy: self.get_energy().get_energy_level()});
                         },
                         Event::TileContentUpdated(_, _) => {
@@ -680,36 +626,54 @@ pub fn timo_ai() -> Html {
                 }
 
                 fn get_energy(&self) -> &Energy {
-                    &self.0.energy
+                    &self.robot.energy
                 }
                 fn get_energy_mut(&mut self) -> &mut Energy {
-                    &mut self.0.energy
+                    &mut self.robot.energy
                 }
 
                 fn get_coordinate(&self) -> &Coordinate {
-                    &self.0.coordinate
+                    &self.robot.coordinate
                 }
                 fn get_coordinate_mut(&mut self) -> &mut Coordinate {
-                    &mut self.0.coordinate
+                    &mut self.robot.coordinate
                 }
 
                 fn get_backpack(&self) -> &BackPack {
-                    &self.0.backpack
+                    &self.robot.backpack
                 }
                 fn get_backpack_mut(&mut self) -> &mut BackPack {
-                    &mut self.0.backpack
+                    &mut self.robot.backpack
                 }
             }
-
+            fn first_tick(jerry: &mut Jerry, world: &mut World){
+                let size = get_world_dimension(world);
+                jerry.world_dim = size;
+                jerry.active_region.spatial_index = calculate_spatial_index(jerry.get_coordinate().get_row(), jerry.get_coordinate().get_col(), size);
+                let explorer = new_explorer(jerry, world, jerry.active_region.spatial_index);
+                jerry.missions.push_back(explorer);
+            }
             // RUNNING THE GAME
-            let r = MyRobot(
-                Robot::new(),
-                backState.clone(),
-                worldState.clone(),
-                robotState.clone(),
-            );
-            struct Tool;
-            impl Tools for Tool {}
+            let r = Jerry{
+                robot: Robot::new(),
+                bps: backState.clone(),
+                ws: worldState.clone(),
+                rs: robotState.clone(),
+                tick_counter: 0,
+                world_dim: 0,
+                active_region: ActiveRegion{
+                    top_left: (279,279), 
+                    bottom_right: (0,0), 
+                    spatial_index: 0
+                },
+                vent: Rc::new(RefCell::new(Vent::new())),
+                road_tiles: HashSet::new(),
+                dynamo: Dynamo{},
+                weather_predictor: WeatherPredictionTool::new(),
+                tom_tom: TomTom{},
+                charting_tools: ChartingTools,
+                missions: VecDeque::new()
+                };
             // let mut generator = WorldGenerator::init(4);
             let mut generator = WorldgeneratorUnwrap::init(false, Some(PathBuf::from("world.bin")));
             let run = Runner::new(Box::new(r), &mut generator);
