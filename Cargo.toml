@@ -21,7 +21,7 @@ ohcrab_weather = { version = "0.1.2", registry = "kellnr" }
 rust_and_furious_dynamo = { version = "0.1.2", registry = "kellnr" }
 vent_tool_ascii_crab = { version = "0.1.4", registry = "kellnr" }
 charting_tools = { version = "1.0.4", registry = "kellnr" }
-worldgen_unwrap = { version = "0.1.2", registry = "kellnr" }
+# worldgen_unwrap = { version = "0.1.2", registry = "kellnr" }
 tungstenite = "0.21.0"
 url = { version = "2.5.0", features = [] }
 rand = "0.8.4"

@@ -13,6 +13,7 @@ use robotics_lib::world::coordinates::Coordinate;
 use robotics_lib::world::tile::{Tile, Content, TileType};
 use robotics_lib::world::World;
 use crate::explorer::{explorer_execute, ExplorerData};
+use crate::interface::Jerry;
 use crate::sector_analyzer::{analyzer_execute, SectorData};
 
 //use crate::road_builder::{build_road, road_builder_execute};

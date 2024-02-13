@@ -516,7 +516,24 @@ fn contentMatch(input: &Content) -> String {
 
 
 
-// TIMO CODE BLYAT
+// TIMO CODE
+pub(crate) struct Jerry{
+    pub(crate) robot: Robot,
+    pub(crate) bps: UseAtomHandle<BackpackState>,
+    pub(crate) ws: UseAtomHandle<WorldState>,
+    pub(crate) rs: UseAtomHandle<RobotState>,
+    pub(crate) tick_counter: usize,
+    pub(crate) world_dim: usize,
+    pub(crate) active_region: ActiveRegion,
+    pub(crate) road_tiles: HashSet<Coordinate>,
+    pub(crate) vent: Rc<RefCell<Vent>>,
+    pub(crate) dynamo: Dynamo,
+    pub(crate) weather_predictor: WeatherPredictionTool,
+    pub(crate) tom_tom: TomTom,
+    pub(crate) charting_tools: ChartingTools,
+    pub(crate) missions: VecDeque<Mission>
+}
+
 #[function_component(TimoAi)]
 pub fn timo_ai() -> Html {
     // USESTATES
@@ -532,22 +549,7 @@ pub fn timo_ai() -> Html {
         let message = message.clone();
         use_effect(move || {
             // Setup world
-            struct Jerry{
-                robot: Robot,
-                bps: UseAtomHandle<BackpackState>,
-                ws: UseAtomHandle<WorldState>,
-                rs: UseAtomHandle<RobotState>,
-                tick_counter: usize,
-                world_dim: usize,
-                active_region: ActiveRegion,
-                road_tiles: HashSet<Coordinate>,
-                vent: Rc<RefCell<Vent>>,
-                dynamo: Dynamo,
-                weather_predictor: WeatherPredictionTool,
-                tom_tom: TomTom,
-                charting_tools: ChartingTools,
-                missions: VecDeque<Mission>
-            };
+            
 
             impl Runnable for Jerry {
                 fn process_tick(&mut self, world: &mut World) {
@@ -679,11 +681,11 @@ pub fn timo_ai() -> Html {
             let run = Runner::new(Box::new(r), &mut generator);
             //Known bug: 'check_world' inside 'Runner::new()' fails every time
             println!("AO");
-            *timeout_handle.borrow_mut() = Some(Timeout::new(10000, move || {
+            *timeout_handle.borrow_mut() = Some(Timeout::new(100, move || {
                 message.set("Placeholder".to_string());
                 match run {
                     Ok(mut r) => {
-                        for _ in 0..100 {
+                        for _ in 0..1 {
                             let _ = r.game_tick();
                             let tmpCoords = r.get_robot().get_coordinate();
                             let msg = JsValue::from(format!("Coords: {:?} Robot inside coords: {:?}", tmpCoords, robotState.coord));

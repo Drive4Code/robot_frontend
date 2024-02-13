@@ -18,6 +18,7 @@ use rust_eze_tomtom::path::Path;
 use rust_eze_tomtom::TomTom;
 use crate::biomes::{detect_biome, is_weather_gonna_be_nice_n, is_weather_nice};
 use crate::explorer::ExplorerError::{FailedToGo, FrontierNotAccessible};
+use crate::interface::Jerry;
 use crate::sector_analyzer::new_sector_analyzer;
 use crate::utils::{calculate_spatial_index, execute_mission, get_world_dimension, robot_map_slice, JerryStatus, Mission};
 use crate::utils::JerryStatus::MissionExecutionError;

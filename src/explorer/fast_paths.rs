@@ -11,7 +11,7 @@ use robotics_lib::utils::calculate_cost_go_with_environment;
 use robotics_lib::world::tile::Tile;
 use robotics_lib::interface::teleport;
 use robotics_lib::interface::go;
-use crate::interface::TimoAi;
+use crate::interface::{TimoAi, Jerry};
 
 pub fn go_to_coordinates(
     robot: &mut Jerry,
