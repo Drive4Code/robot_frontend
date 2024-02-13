@@ -12,7 +12,7 @@ crate-type = ["cdylib"]
 path = "src/lib.rs"
 
 [dependencies]
-robotics_lib = {version="0.1.21", registry="kellnr"}#{path="../Robotic-Lib"}#{path="../Robotic-Lib"} #{version="0.1.21", registry="kellnr"}      # {path="../Robotic-Lib"}
+robotics_lib = {version="0.1.21", registry="kellnr"}#{path="../Robotic-Lib"}
 # worldgen_unwrap = {version="0.1.2", registry="kellnr"} 
 rust_eze_tomtom = {version = "1.1.5", registry = "kellnr" }
 bob_lib = { version = "0.1.1", registry = "kellnr" }
@@ -30,11 +30,6 @@ strum = "0.26.1"
 strum_macros = { version = "0.26.1", features = [] }
 serde = { version = "1.0.193", features = ["serde_derive"] }
 
-# "client" = {path="../robot_web_python/client_example"}
-# tungstenite = "0.21"
-# tokio = { version = "1.35.0", features = ["full"] }
-# url = "1.7.2"
-
 # Frontend Dependencies
 getrandom = { version = "0.2", features = ["js"] }
 wasm-bindgen = "0.2"
@@ -45,6 +40,7 @@ log = "0.4.6"
 implicit-clone= {version="0.3.6"}
 yew = { version="0.21", features = ["csr"] }
 yew-agent = "0.3"
+yew-hooks = "0.3"
 yewdux = "0.10"
 bounce = "0.9.0"
 gloo-timers = "0.3"

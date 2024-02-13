@@ -27,6 +27,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 // use worldgen_unwrap::public::*;
 include!("worldloader.rs");
 use std::path::PathBuf;
+use yew_hooks::use_timeout;
 
 // Frontend
 use yew::prelude::*;
@@ -343,25 +344,24 @@ pub fn ai() -> Html {
             let run = Runner::new(Box::new(r), &mut generator);
             //Known bug: 'check_world' inside 'Runner::new()' fails every time
             println!("AO");
-            *timeout_handle.borrow_mut() = Some(Timeout::new(10000, move || {
-                message.set("Placeholder".to_string());
-                match run {
-                    Ok(mut r) => {
-                        for _ in 0..100 {
-                            let _ = r.game_tick();
-                            let tmpCoords = r.get_robot().get_coordinate();
-                            let msg = JsValue::from(format!("Coords: {:?} Robot inside coords: {:?}", tmpCoords, robotState.coord));
-                            robotState.set(RobotState {
-                                coord: (tmpCoords.get_row(), tmpCoords.get_col()),
-                                energy: robotState.energy.clone()
-                            });
-                            info!("{}", msg.as_string().unwrap());
-                            // robotics_lib::interface::
-                        }
+            use_timeout(move || {
+            match run {
+                Ok(mut r) => {
+                    for _ in 0..100 {
+                        let _ = &mut r.game_tick();
+                        let tmpCoords = r.get_robot().get_coordinate();
+                        let msg = JsValue::from(format!("Coords: {:?} Robot inside coords: {:?}", tmpCoords, robotState.coord));
+                        robotState.set(RobotState {
+                            coord: (tmpCoords.get_row(), tmpCoords.get_col()),
+                            energy: robotState.energy.clone()
+                        });
+                        info!("{}", msg.as_string().unwrap());
+                        // robotics_lib::interface::
                     }
-                    Err(e) => println!("{:?}", e),
                 }
-            }));
+                Err(e) => println!("{:?}", e),
+            }
+        }, 100);
 
             || println!("Done!")
         });
