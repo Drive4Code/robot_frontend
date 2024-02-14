@@ -1,6 +1,6 @@
 .tile img {
-    height: 5px;
-    width: 5px;
+    height: 1px;
+    width: 1px;
 }
 /* Relative position */
 .tile {
@@ -27,8 +27,8 @@
 }
 
 #robot_view img {
-    width: 25px;
-    height: 25px;
+    width: 15px;
+    height: 15px;
 }
 
 /* #backpack {

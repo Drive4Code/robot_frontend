@@ -1,20 +1,20 @@
 use std::any::Any;
-use std::cell::RefCell;
-use std::collections::HashSet;
+
+
 use std::hash::{Hash, Hasher};
-use std::ops::Add;
-use std::rc::Rc;
-use bob_lib::tracker::{Goal, GoalTracker};
-use charting_tools::charted_coordinate::ChartedCoordinate;
-use robotics_lib::interface::{robot_map, Direction};
-use robotics_lib::runner::Runnable;
+
+
+use bob_lib::tracker::{GoalTracker};
+
+use robotics_lib::interface::{Direction};
+
 use robotics_lib::utils::LibError;
-use robotics_lib::world::coordinates::Coordinate;
-use robotics_lib::world::tile::{Tile, Content, TileType};
+
+use robotics_lib::world::tile::{Tile};
 use robotics_lib::world::World;
-use crate::explorer::{explorer_execute, ExplorerData};
+use crate::explorer::{explorer_execute};
 use crate::interface::Jerry;
-use crate::sector_analyzer::{analyzer_execute, SectorData};
+use crate::sector_analyzer::{analyzer_execute};
 
 //use crate::road_builder::{build_road, road_builder_execute};
 
@@ -66,7 +66,7 @@ pub enum JerryStatus{
     ExpectingNiceWeather
 }
 pub fn execute_mission (jerry: &mut Jerry, world: &mut World){
-    let mission = jerry.missions.iter_mut().enumerate().find(|(i, mission)| mission.status != MissionStatus::Completed);
+    let mission = jerry.missions.iter_mut().enumerate().find(|(_i, mission)| mission.status != MissionStatus::Completed);
     if mission.is_none() {
         println!("I got nothing to do!");
     }
@@ -111,7 +111,7 @@ pub fn get_tl_and_br_from_spatial_index(spatial_index: usize, size: usize) -> ((
     let section_index_row = spatial_index / num_sections_cols;
 
     //first calculate the default values
-    let mut top_left = (section_index_row * num_rows_per_section, section_index_col * num_cols_per_section);
+    let top_left = (section_index_row * num_rows_per_section, section_index_col * num_cols_per_section);
     let mut bottom_right = (top_left.0 + num_rows_per_section - 1, top_left.1 + num_cols_per_section - 1);
     println!("{:?}", (top_left, bottom_right));
     if size % SECTOR_DIMENSION == 0 {

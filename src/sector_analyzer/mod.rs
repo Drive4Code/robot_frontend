@@ -1,11 +1,11 @@
 use std::collections::{HashMap, HashSet};
-use std::hash::Hash;
+
 use robotics_lib::interface::robot_map;
 use robotics_lib::world::tile::TileType::*;
-use robotics_lib::world::{self, World};
+use robotics_lib::world::{World};
 use robotics_lib::world::tile::{Content, Tile};
-use crate::interface::TimoAi;
-use crate::utils::{get_tl_and_br_from_spatial_index, robot_map_slice, MissionStatus};
+
+use crate::utils::{get_tl_and_br_from_spatial_index, robot_map_slice};
 use crate::utils::{ActiveRegion, Mission};
 use crate::utils::MissionStatus::Active;
 use crate::morans_i::{morans_i};
@@ -72,7 +72,7 @@ pub fn analyzer_execute(world: &mut World, tl: (usize, usize), br: (usize, usize
            }
         }
     }
-    for (c, cores) in clusters.iter(){
+    for (_c, cores) in clusters.iter(){
         let centroid = get_centroid(cores);
         nodes.push(centroid);
     }
@@ -95,7 +95,7 @@ pub fn sector_collectable(sector: &Vec<Vec<Option<Tile>>>) -> HashMap<Content, u
                 if !content.properties().destroy(){
                     continue;
                 }  
-                let mut count = resources.entry(content.to_default().clone()).or_insert(0);
+                let count = resources.entry(content.to_default().clone()).or_insert(0);
                 match content.get_value(){
                     (Some(amount), None) => {
                         *count += amount;
