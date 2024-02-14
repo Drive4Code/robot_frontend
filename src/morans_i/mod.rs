@@ -1,5 +1,5 @@
 use robotics_lib::world::tile::Tile;
-use robotics_lib::world::tile::{Content, TileType};
+use robotics_lib::world::tile::{Content};
 use rand::Rng;
 
 /*
@@ -84,6 +84,8 @@ pub fn get_w(n:usize) -> usize{
 }
 #[cfg(test)]
 mod tests {
+    use robotics_lib::world::tile::TileType;
+
     use super::*;
 
     #[test]

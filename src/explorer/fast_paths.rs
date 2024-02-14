@@ -11,7 +11,7 @@ use robotics_lib::utils::calculate_cost_go_with_environment;
 use robotics_lib::world::tile::Tile;
 use robotics_lib::interface::teleport;
 use robotics_lib::interface::go;
-use crate::interface::{TimoAi, Jerry};
+use crate::interface::{Jerry};
 
 pub fn go_to_coordinates(
     robot: &mut Jerry,
@@ -321,7 +321,7 @@ pub(crate) fn get_adjacent_tiles(
 
 
 pub(crate) fn calculate_go_cost(
-    robot: &impl Runnable,
+    _robot: &impl Runnable,
     world: &World,
     map: &Vec<Vec<Option<Tile>>>,
     source: (usize, usize),

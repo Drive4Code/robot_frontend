@@ -1,28 +1,28 @@
-use std::collections::{BinaryHeap, HashSet, VecDeque};
-use std::f32::consts::E;
-use std::fmt::Error;
-use std::hash::Hash;
-use std::ops::Deref;
+use std::collections::{HashSet};
+
+
+
+
 use std::rc::Rc;
 use std::cell::RefCell;
-use bob_lib::tracker::GoalTracker;
+
 use charting_tools::charted_coordinate::ChartedCoordinate;
 use charting_tools::charted_paths::ChartedPaths;
 use charting_tools::ChartingTools;
-use robotics_lib::interface::{go, look_at_sky, one_direction_view, robot_map, robot_view, where_am_i, Direction};
-use robotics_lib::runner::{Robot, Runnable};
-use robotics_lib::world::coordinates::Coordinate;
+use robotics_lib::interface::{go, look_at_sky, robot_map, where_am_i, Direction};
+use robotics_lib::runner::{Runnable};
+
 use robotics_lib::world::tile::Tile;
-use robotics_lib::world::{self, World};
-use rust_eze_tomtom::path::Path;
+use robotics_lib::world::{World};
+
 use rust_eze_tomtom::TomTom;
 use crate::biomes::{detect_biome, is_weather_gonna_be_nice_n, is_weather_nice};
 use crate::explorer::ExplorerError::{FailedToGo, FrontierNotAccessible};
 use crate::interface::Jerry;
 use crate::road_builder::generate_road_builders;
 use crate::sector_analyzer::{analyzer_execute, new_sector_analyzer};
-use crate::utils::{calculate_spatial_index, execute_mission, get_world_dimension, robot_map_slice, ActiveRegion, JerryStatus, Mission};
-use crate::utils::JerryStatus::MissionExecutionError;
+use crate::utils::{calculate_spatial_index, robot_map_slice, ActiveRegion, JerryStatus, Mission};
+
 use crate::utils::MissionStatus::{Active, Completed};
 use rust_and_furious_dynamo::dynamo::Dynamo;
 use rand::Rng;
@@ -411,7 +411,7 @@ fn update_frontier(jerry: &mut Jerry, world: &mut World, map: &Vec<Vec<Option<Ti
 
             //check if there's a mission for the spatial index of the tile
             let jerry_immut = jerry.borrow();
-            let data: &ExplorerData = jerry_immut.missions.get(mission_index).unwrap().additional_data.as_ref().unwrap().downcast_ref().unwrap();
+            let _data: &ExplorerData = jerry_immut.missions.get(mission_index).unwrap().additional_data.as_ref().unwrap().downcast_ref().unwrap();
             let mission_exists = jerry_immut.missions.iter().any(|mission| {
                 if let Some(explorer_data) = mission.additional_data.as_ref().unwrap().downcast_ref::<ExplorerData>(){
                     explorer_data.spatial_index == spatial_index

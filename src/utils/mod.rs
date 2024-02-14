@@ -66,7 +66,7 @@ pub enum JerryStatus{
     Common(LibError),
     ExpectingNiceWeather,
 }
-pub fn execute_mission (jerry: &mut Jerry, world: &mut World){
+pub(crate) fn execute_mission (jerry: &mut Jerry, world: &mut World){
 
 
     //after every 2 completed explorers, need to build the roads
