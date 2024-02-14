@@ -1,3 +1,4 @@
+use charting_tools::charted_coordinate::ChartedCoordinate;
 use charting_tools::ChartingTools;
 use ohcrab_weather::weather_tool::WeatherPredictionTool;
 // Project imports
@@ -525,7 +526,7 @@ pub(crate) struct Jerry{
     pub(crate) tick_counter: usize,
     pub(crate) world_dim: usize,
     pub(crate) active_region: ActiveRegion,
-    pub(crate) road_tiles: HashSet<Coordinate>,
+    pub(crate) road_tiles: HashSet<ChartedCoordinate>,
     pub(crate) vent: Rc<RefCell<Vent>>,
     pub(crate) dynamo: Dynamo,
     pub(crate) weather_predictor: WeatherPredictionTool,
@@ -593,9 +594,20 @@ pub fn timo_ai() -> Html {
                                 content: newInside,
                             });
                         }
-                        // Event::Moved(newTile, (coord1, coord2)) => {
-                            
-                        // }
+                        | Event::Moved(_, position) => {
+                            if position.0 >= self.active_region.bottom_right.0 {
+                                self.active_region.bottom_right.0 = if position.0 == self.world_dim - 1 { self.world_dim - 1 } else { position.0 + 1 };
+                            }
+                            if position.1 >= self.active_region.bottom_right.1 {
+                                self.active_region.bottom_right.1 = if position.1 == self.world_dim - 1 { self.world_dim - 1 } else { position.1 + 1 };
+                            }
+                            if position.0 <= self.active_region.top_left.0 {
+                                self.active_region.top_left.0 = if position.0 == 0 { 0 } else { position.0 - 1 };
+                            }
+                            if position.1 <= self.active_region.top_left.1 {
+                                self.active_region.top_left.1 = if position.1 == 0 { 0 } else { position.1 - 1 };
+                            }
+                        }
                         // Event::Ready => todo!(),
                         // Event::Terminated => todo!(),
                         Event::TimeChanged(newEnviromentalConds) => {
