@@ -530,7 +530,7 @@ dependencies = [
 
 [[package]]
 name = "frontend_wasm"
-version = "0.2.0"
+version = "1.0.0"
 dependencies = [
  "bessie",
  "bincode",
@@ -540,7 +540,6 @@ dependencies = [
  "egui",
  "egui_extras",
  "getrandom",
- "gloo-timers 0.3.0",
  "implicit-clone 0.3.9",
  "js-sys",
  "lazy_static",
