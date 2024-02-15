@@ -3,4 +3,5 @@
 <ol>
   <li>rustup target add wasm32-unkown-unkown</li>
   <li>cargo install --locked trunk</li>
+  <li>trunk serve</li>
 </ol>
