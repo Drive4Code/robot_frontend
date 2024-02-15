@@ -19,8 +19,9 @@ use rust_eze_tomtom::TomTom;
 use crate::biomes::{detect_biome, is_weather_gonna_be_nice_n, is_weather_nice};
 use crate::explorer::ExplorerError::{FailedToGo, FrontierNotAccessible};
 use crate::interface::Jerry;
-use crate::sector_analyzer::new_sector_analyzer;
-use crate::utils::{calculate_spatial_index, robot_map_slice, JerryStatus, Mission};
+use crate::road_builder::generate_road_builders;
+use crate::sector_analyzer::{analyzer_execute, new_sector_analyzer};
+use crate::utils::{calculate_spatial_index, robot_map_slice, ActiveRegion, JerryStatus, Mission};
 
 use crate::utils::MissionStatus::{Active, Completed};
 use rust_and_furious_dynamo::dynamo::Dynamo;
@@ -97,6 +98,7 @@ pub fn explorer_execute(jerry: &mut Jerry, world: &mut World, mission_index: usi
             //Debugging
             //println!("Updating web page ");
             //let time_web = std::time::Instant::now();
+
             jerry.active_region.top_left = (jerry.get_coordinate().get_row(), jerry.get_coordinate().get_col());
             jerry.active_region.bottom_right = jerry.active_region.top_left;
 
@@ -121,10 +123,21 @@ pub fn explorer_execute(jerry: &mut Jerry, world: &mut World, mission_index: usi
         let spatial_index = data.spatial_index.clone();
 
         //if the frontier is empty, the robot should stop executing the mission
+        //and execute the analyzer
         if data.frontier.is_empty(){
             mission.as_mut().unwrap().status = Completed;
+
             let new_analyzer = new_sector_analyzer(spatial_index, jerry.world_dim);
-            jerry.missions.push_back(new_analyzer);
+            println!("Analyzing sector {}", spatial_index);
+            let data = new_analyzer.additional_data.as_ref().unwrap().downcast_ref::<ActiveRegion>().unwrap();
+            let (tl, br) = (data.top_left, data.bottom_right);
+            let sector_data = analyzer_execute(world, tl, br);
+            println!("Sector data: {:?}", sector_data);
+            generate_road_builders(jerry, world, sector_data);
+            jerry.active_region.top_left = tl;
+            jerry.active_region.bottom_right = br;
+            let map = robot_map(world).unwrap();
+
             return Ok(());
         }
 
@@ -137,9 +150,18 @@ pub fn explorer_execute(jerry: &mut Jerry, world: &mut World, mission_index: usi
         if selected_tile.is_err(){
             let mut mission = jerry.missions.get_mut(mission_index);
             mission.as_mut().unwrap().status = Completed;
+
             let new_analyzer = new_sector_analyzer(spatial_index, jerry.world_dim);
-            jerry.missions.push_back(new_analyzer);
-            return Ok(()); 
+            println!("Analyzing sector {}", spatial_index);
+            let data = new_analyzer.additional_data.as_ref().unwrap().downcast_ref::<ActiveRegion>().unwrap();
+            let (tl, br) = (data.top_left, data.bottom_right);
+            let sector_data = analyzer_execute(world, tl, br);
+            println!("Sector data: {:?}", sector_data);
+            generate_road_builders(jerry, world, sector_data);
+            jerry.active_region.top_left = tl;
+            jerry.active_region.bottom_right = br;
+            
+            return Ok(());
         }
 
         //Debugging
@@ -436,19 +458,19 @@ fn remove_tile_from_frontier(jerry: &mut Jerry, tile: ChartedCoordinate, mission
     let _ = data.frontier.remove(index);
     let _ = data.frontier_hs.remove(&tile);
 }
-fn is_adjacent(a: ChartedCoordinate, b: ChartedCoordinate) -> bool{
+pub(crate) fn is_adjacent(a: ChartedCoordinate, b: ChartedCoordinate) -> bool{
     if (a.0 == b.0 && (a.1 == b.1 + 1 || a.1 == b.1.saturating_sub(1))) || (a.1 == b.1 && (a.0 == b.0 + 1 || a.0 == b.0.saturating_sub(1))){
         return true;
     }
     false
 }
-fn is_within_n(a: ChartedCoordinate, b: ChartedCoordinate, n: usize) -> bool{
+pub(crate) fn is_within_n(a: ChartedCoordinate, b: ChartedCoordinate, n: usize) -> bool{
     if (a.0 as i32 - b.0 as i32).abs() < n as i32 && (a.1 as i32 - b.1 as i32).abs() < n as i32{
         return true;
     }
     false
 }
-fn coordinate_to_direction(a: ChartedCoordinate, b: ChartedCoordinate) -> Direction{
+pub(crate) fn coordinate_to_direction(a: ChartedCoordinate, b: ChartedCoordinate) -> Direction{
     if a.0 == b.0{
         if b.1 == a.1 + 1{
             return Direction::Right;
@@ -467,7 +489,7 @@ fn coordinate_to_direction(a: ChartedCoordinate, b: ChartedCoordinate) -> Direct
     }
 }
 //returns a slice of the robot map which is nxn area around the robot (or less if the robot is near the edge of the map)
-fn robot_map_slice_n
+pub(crate) fn robot_map_slice_n
     (jerry: &mut Jerry, robot_map: &Vec<Vec<Option<Tile>>>, n: usize)
      -> Option<Vec<Vec<Option<Tile>>>>{
     let center = (jerry.get_coordinate().get_row(), jerry.get_coordinate().get_col());

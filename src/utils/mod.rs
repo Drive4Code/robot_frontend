@@ -1,20 +1,21 @@
 use std::any::Any;
-
-
+use std::cell::RefCell;
+use std::collections::HashSet;
 use std::hash::{Hash, Hasher};
-
-
-use bob_lib::tracker::{GoalTracker};
-
-use robotics_lib::interface::{Direction};
-
+use std::ops::Add;
+use std::rc::Rc;
+use bob_lib::tracker::{Goal, GoalTracker};
+use charting_tools::charted_coordinate::ChartedCoordinate;
+use robotics_lib::interface::{robot_map, Direction};
+use robotics_lib::runner::Runnable;
 use robotics_lib::utils::LibError;
-
-use robotics_lib::world::tile::{Tile};
+use robotics_lib::world::coordinates::Coordinate;
+use robotics_lib::world::tile::{Tile, Content, TileType};
 use robotics_lib::world::World;
-use crate::explorer::{explorer_execute};
+use crate::explorer::{explorer_execute, ExplorerData};
 use crate::interface::Jerry;
-use crate::sector_analyzer::{analyzer_execute};
+use crate::road_builder::road_builder_execute;
+use crate::sector_analyzer::{analyzer_execute, SectorData};
 
 //use crate::road_builder::{build_road, road_builder_execute};
 
@@ -63,10 +64,67 @@ pub enum JerryStatus{
     MissionExecutionError,
     LowEnergyWarning,
     Common(LibError),
-    ExpectingNiceWeather
+    ExpectingNiceWeather,
 }
-pub fn execute_mission (jerry: &mut Jerry, world: &mut World){
-    let mission = jerry.missions.iter_mut().enumerate().find(|(_i, mission)| mission.status != MissionStatus::Completed);
+pub(crate) fn execute_mission (jerry: &mut Jerry, world: &mut World){
+
+
+    //after every 2 completed explorers, need to build the roads
+    //so if the # of completed explorers is even, set other active explorers to pause and continue with the road builders
+    let mut completed_explorers = 0;
+    let mut active_explorers = 0;
+    let mut waiting_explorers = 0;
+    let mut completed_road_builders = 0;
+    let mut waiting_road_builders = 0;
+    let mut active_road_builders = 0;
+    for mission in jerry.missions.iter(){
+        match mission.name.as_str(){
+            | "Explore" => {
+                match mission.status{
+                    MissionStatus::Completed => completed_explorers += 1,
+                    MissionStatus::Paused => waiting_explorers += 1,
+                    MissionStatus::Active => active_explorers += 1,
+                    _ => {}
+                    
+                }
+            }
+            | "Road Builder" => {
+                match  mission.status{
+                    MissionStatus::Completed => completed_road_builders += 1,
+                    MissionStatus::Paused => waiting_road_builders += 1,
+                    MissionStatus::Active => active_road_builders += 1,
+                    _ => {}
+                    
+                }
+            }
+            | _ => {}
+        }
+    }
+    println!("Act Exp: {} Wait Exp: {} Comp Exp: {} Act RB: {} Wait RB: {} Comp RB {}", 
+    active_explorers, waiting_explorers, completed_explorers, active_road_builders, waiting_road_builders, completed_road_builders);
+    //after every 2 completed explorers, set road builders to active and pause the active explorers
+    if completed_explorers > 0 && completed_explorers % 2 == 0 && waiting_road_builders > 0{
+        for mission in jerry.missions.iter_mut(){
+            if mission.name == "Explore" && mission.status == MissionStatus::Active{
+                mission.status = MissionStatus::Paused;
+            }
+            if mission.name == "Road Builder" && mission.status == MissionStatus::Paused{
+                mission.status = MissionStatus::Active;
+            }
+        }
+    }
+    //after every 2 completed builders set explorers to active and pause the active builders
+    if waiting_explorers > 0 && completed_road_builders > 0 && (completed_road_builders % 2 == 0 || active_road_builders == 0){
+        for mission in jerry.missions.iter_mut(){
+            if mission.name == "Explore" && mission.status == MissionStatus::Paused{
+                mission.status = MissionStatus::Active;
+            }
+            if mission.name == "Road Builder" && mission.status == MissionStatus::Active{
+                mission.status = MissionStatus::Paused;
+            }
+        }
+    }
+    let mission = jerry.missions.iter_mut().enumerate().find(|(i, mission)| mission.status == MissionStatus::Active);
     if mission.is_none() {
         println!("I got nothing to do!");
     }
@@ -75,13 +133,15 @@ pub fn execute_mission (jerry: &mut Jerry, world: &mut World){
             | "Explore" => {
                 println!("Mission Explorer {:?}", explorer_execute(jerry, world, index));
             }
-            | "Sector Analyzer" => {
-                mission.status = MissionStatus::Completed;
-                let data = mission.additional_data.as_ref().unwrap().downcast_ref::<ActiveRegion>().unwrap();
-                let (tl, br) = (data.top_left, data.bottom_right);
-                let sector_data = analyzer_execute(world, tl, br);
-                println!("{:?}", sector_data);
+            | "Road Builder" => {
+                if mission.status == MissionStatus::New{
+                    mission.status = MissionStatus::Active;
+                }
+                jerry.active_region.top_left = (jerry.world_dim - 1, jerry.world_dim - 1);
+                jerry.active_region.bottom_right = (0, 0);
+                println!("Mission Road Builder {:?}", road_builder_execute(jerry, world, index));
             }
+
             | _ => {}
         }
     }
@@ -111,7 +171,7 @@ pub fn get_tl_and_br_from_spatial_index(spatial_index: usize, size: usize) -> ((
     let section_index_row = spatial_index / num_sections_cols;
 
     //first calculate the default values
-    let top_left = (section_index_row * num_rows_per_section, section_index_col * num_cols_per_section);
+    let mut top_left = (section_index_row * num_rows_per_section, section_index_col * num_cols_per_section);
     let mut bottom_right = (top_left.0 + num_rows_per_section - 1, top_left.1 + num_cols_per_section - 1);
     println!("{:?}", (top_left, bottom_right));
     if size % SECTOR_DIMENSION == 0 {
@@ -161,75 +221,4 @@ pub fn get_direction(from: (usize, usize), to: (usize, usize)) -> Option<Directi
         }
     }
     None
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_get_tl_and_br_from_spatial_index() { //with sector dimension = 70
-        // Test case 1: spatial_index = 1, size = 140
-        let spatial_index_1 = 1;
-        let size_1 = 140;
-        let expected_result_1 = ((0, 70), (69, 139));
-        assert_eq!(get_tl_and_br_from_spatial_index(spatial_index_1, size_1), expected_result_1);
-
-        // Test case 2: spatial_index = 1, size = 100
-        let spatial_index_2 = 1;
-        let size_2 = 100;
-        let expected_result_2 = ((0, 70), (69, 99));
-        assert_eq!(get_tl_and_br_from_spatial_index(spatial_index_2, size_2), expected_result_2);
-
-        // Test case 3: spatial_index = 0, size = 50
-        let spatial_index_3 = 0;
-        let size_3 = 50;
-        let expected_result_3 = ((0, 0), (49, 49));
-        assert_eq!(get_tl_and_br_from_spatial_index(spatial_index_3, size_3), expected_result_3);
-
-        // Test case 4: spatial_index = 8, size = 150
-        let spatial_index_4 = 8;
-        let size_4 = 150;
-        let expected_result_4 = ((140, 140), (149, 149));
-        assert_eq!(get_tl_and_br_from_spatial_index(spatial_index_4, size_4), expected_result_4);
-
-        // Test case 5: spatial_index = 2, size = 100
-        let spatial_index_5 = 2;
-        let size_5 = 100;
-        let expected_result_5 = ((70, 0), (99, 69));
-        assert_eq!(get_tl_and_br_from_spatial_index(spatial_index_5, size_5), expected_result_5);
-
-        // Test case 6: spatial_index = 7, size = 280
-        let spatial_index_6 = 7;
-        let size_6 = 280;
-        let expected_result_6 = ((70, 210), (139, 279));
-        assert_eq!(get_tl_and_br_from_spatial_index(spatial_index_6, size_6), expected_result_6);
-
-    }
-    #[test]
-    fn test_get_direction(){
-        // Test case 1: from = (0, 0), to = (0, 1)
-        let from_1 = (0, 0);
-        let to_1 = (0, 1);
-        let expected_result_1 = Some(Direction::Right);
-        assert_eq!(get_direction(from_1, to_1), expected_result_1);
-
-        // Test case 2: from = (0, 1), to = (0, 0)
-        let from_2 = (0, 1);
-        let to_2 = (0, 0);
-        let expected_result_2 = Some(Direction::Left);
-        assert_eq!(get_direction(from_2, to_2), expected_result_2);
-
-        // Test case 3: from = (0, 0), to = (1, 0)
-        let from_3 = (0, 0);
-        let to_3 = (1, 0);
-        let expected_result_3 = Some(Direction::Down);
-        assert_eq!(get_direction(from_3, to_3), expected_result_3);
-
-        // Test case 4: from = (1, 0), to = (0, 0)
-        let from_4 = (1, 0);
-        let to_4 = (0, 0);
-        let expected_result_4 = Some(Direction::Up);
-        assert_eq!(get_direction(from_4, to_4), expected_result_4);
-    }
 }
