@@ -4,7 +4,7 @@ use ohcrab_weather::weather_tool::WeatherPredictionTool;
 // Project imports
 use robotics_lib::energy::Energy;
 use robotics_lib::event::events::{Event};
-use robotics_lib::interface::{robot_map};
+use robotics_lib::interface::{look_at_sky, robot_map};
 
 use robotics_lib::runner::backpack::{BackPack};
 use robotics_lib::runner::{Robot, Runnable, Runner};
@@ -24,6 +24,9 @@ use robotics_lib::world::World;
 use rust_eze_tomtom::TomTom;
 use vent_tool_ascii_crab::Vent;
 use std::collections::{HashMap, HashSet, VecDeque};
+use crate::explorer::new_explorer;
+use crate::utils::{calculate_spatial_index, execute_mission, get_world_dimension, ActiveRegion, Mission};
+use rust_and_furious_dynamo::dynamo::Dynamo;
 
 // Frontend
 include!("worldloader.rs");
@@ -31,14 +34,10 @@ use std::path::PathBuf;
 use yew::prelude::*;
 use yew::{function_component, html, Html, Properties};
 use bounce::*;
-use gloo_timers::callback::Timeout;
 use std::cell::RefCell;
 use std::rc::Rc;
 use log::info;
 use wasm_bindgen::JsValue;
-use crate::explorer::new_explorer;
-use crate::utils::{calculate_spatial_index, execute_mission, get_world_dimension, ActiveRegion, Mission};
-use rust_and_furious_dynamo::dynamo::Dynamo;
 use web_sys::{window};
 use wasm_bindgen_futures::JsFuture;
 
@@ -61,17 +60,7 @@ impl Default for BackpackState {
 }
 
 #[derive(Clone, PartialEq, Atom)]
-struct StartAi(bool);
-
-impl Default for StartAi {
-    fn default() -> Self {
-        Self(false)
-    }
-}
-
-#[derive(Clone, PartialEq, Atom)]
 struct WorldState {
-    enviromentalConditions: EnvironmentalConditions,
     world: Vec<Vec<Option<Tile>>>,
     counter: usize,
 }
@@ -79,9 +68,23 @@ struct WorldState {
 impl Default for WorldState {
     fn default() -> Self {
         Self {
-            enviromentalConditions: EnvironmentalConditions::new(&vec![WeatherType::Sunny], 1, 1).unwrap(),
-            world: vec![vec![None]], // Temp Vec. The values here are literally useless.
+            world: vec![vec![None]], // Placeholders
             counter: 0,
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Atom)]
+struct EnviromentalState {
+    forecast: WeatherType,
+    time: String,
+}
+
+impl Default for EnviromentalState {
+    fn default() -> Self {
+        Self {
+            forecast: WeatherType::Sunny,
+            time: String::new(),
         }
     }
 }
@@ -98,275 +101,36 @@ impl Default for RobotState {
     }
 }
 
+#[derive(Clone, PartialEq, Atom)]
+struct EnergyState {
+    energy: usize,
+    // energy: usize,
+}
+
+impl Default for EnergyState {
+    fn default() -> Self {
+        Self { energy: 0 }
+    }
+}
+
 #[function_component(Main)]
 pub fn main() -> Html {
-    let _startAi = use_atom::<StartAi>();
     let msg = JsValue::from(format!("Rendered Main"));
     info!("{}", msg.as_string().unwrap());
     html! {
         html! {
             <div id="info">
-            
-                // { if &startAi.0 == &true {
-                //     // html! {<Ai/>}
-                //     html! {<TimoAi/>}
-                //     // html! {<></>}
-                // } else {
-                //     html! {<></>}
-                // }
-                // }
-
-                <BackP/>
+                // <BackP/>
+                <EnergyBar/>
+                <EnviromentBar />
+                <br/>
                 <MapView/>
             </div>
-            // <div id="grid">
-
-            // </div>
 
         }
     }
 }
 
-#[function_component(ActivateAi)]
-pub fn activateAi() -> Html {
-    let startAi = use_atom::<StartAi>();
-    startAi.set(StartAi(true));
-    html! {
-        <></>
-    }
-}
-
-// #[function_component(Ai)]
-// pub fn ai() -> Html {
-//     // USESTATES
-//     let backState = use_atom::<BackpackState>();
-//     let world_state = use_atom::<WorldState>();
-//     let robotState = use_atom::<RobotState>();
-
-//     let msg = JsValue::from(format!("Ai Running"));
-//     info!("{}", msg.as_string().unwrap());
-//     let message = use_state(|| "Waiting...".to_string());
-//     let _timeout_handle = use_mut_ref(|| None::<Timeout>);
-//     {
-//         let _message = message.clone();
-//         use_effect(move || {
-//             // Setup world
-//             struct MyRobot(
-//                 Robot,
-//                 UseAtomHandle<BackpackState>,
-//                 UseAtomHandle<WorldState>,
-//                 UseAtomHandle<RobotState>,
-//             );
-
-//             impl Runnable for MyRobot {
-//                 fn process_tick(&mut self, world: &mut World) {
-//                     for _ in 0..1 {
-//                         let (tmp, a, b) = debug(self, world);
-//                         let environmental_conditions = look_at_sky(world);
-//                         println!(
-//                             "Daytime: {:?}, Time:{:?}, Weather: {:?}\n",
-//                             environmental_conditions.get_time_of_day(),
-//                             environmental_conditions.get_time_of_day_string(),
-//                             environmental_conditions.get_weather_condition()
-//                         );
-//                         for elem in tmp.iter() {
-//                             for tile in elem.iter() {
-//                                 match tile.tile_type {
-//                                     DeepWater => {
-//                                         print!("DW");
-//                                     }
-//                                     ShallowWater => {
-//                                         print!("SW");
-//                                     }
-//                                     Sand => {
-//                                         print!("Sa");
-//                                     }
-//                                     Grass => {
-//                                         print!("Gr");
-//                                     }
-//                                     Street => {
-//                                         print!("St");
-//                                     }
-//                                     Hill => {
-//                                         print!("Hi");
-//                                     }
-//                                     Mountain => {
-//                                         print!("Mt");
-//                                     }
-//                                     Snow => {
-//                                         print!("Sn");
-//                                     }
-//                                     Lava => {
-//                                         print!("La");
-//                                     }
-//                                     Teleport(_) => {
-//                                         print!("Tl");
-//                                     }
-//                                     TileType::Wall => {
-//                                         print!("Wl");
-//                                     }
-//                                 }
-//                                 match &tile.content {
-//                                     Rock(quantity) => print!("->Ro {}", quantity),
-//                                     Tree(quantity) => print!("->Tr {}", quantity),
-//                                     Garbage(quantity) => print!("->Gr {}", quantity),
-//                                     Fire => print!("->Fi -"),
-//                                     Coin(quantity) => print!("->Co {}", quantity),
-//                                     Bin(range) => print!("->Bi {}-{}", range.start, range.end),
-//                                     Crate(range) => print!("->Cr {}-{}", range.start, range.end),
-//                                     Bank(range) => print!("->Ba {}-{}", range.start, range.end),
-//                                     Water(quantity) => print!("->Wa {}", quantity),
-//                                     Content::None => print!("->No -"),
-//                                     Fish(quantity) => print!("->Fh {}", quantity),
-//                                     Market(quantity) => print!("->Mk {}", quantity),
-//                                     Building => print!("->Bui -"),
-//                                     Bush(quantity) => print!("->Bu {}", quantity),
-//                                     JollyBlock(quantity) => print!("->Jo {}", quantity),
-//                                     Scarecrow => print!("->Sc -"),
-//                                 }
-//                                 print!("\t| ");
-//                             }
-//                             println!();
-//                         }
-//                         println!("{:?}, {:?}", a, b);
-//                         // match ris {
-//                         //     | Ok(values) => println!("Ok"),
-//                         //     | Err(e) => println!("{:?}", e),
-//                         // }
-//                     }
-//                     println!("HERE {:?}", destroy(self, world, Direction::Down));
-//                     let _ = go(self, world, Direction::Down);
-//                     println!("CRAFT: {:?}", craft(self, Content::Garbage(0)));
-//                     println!("\n\nBACKPACK: {:?}\n\n", self.get_backpack());
-//                     println!("HERE {:?}", teleport(self, world, (1, 1)));
-//                     // Update UI State
-//                     let worldStatus = self.2.clone();
-//                     // robotics_lib::interface::
-//                     let tmpMap = robot_map(&world).unwrap_or_default();
-//                     let msg = JsValue::from(format!("TEST {:?}", tmpMap));
-//                     info!("{}", msg.as_string().unwrap());
-//                     worldStatus.set(WorldState {
-//                         world: tmpMap,
-//                         enviromentalConditions: worldStatus.enviromentalConditions.clone(),
-//                     });
-//                 }
-
-//                 fn handle_event(&mut self, event: Event) {
-//                     println!();
-//                     println!("{:?}", event);
-//                     // Logs the event to the console
-//                     let msg = JsValue::from(format!("{:?}", event));
-//                     info!("{}", msg.as_string().unwrap());
-//                     // Backpack Updates
-//                     let backStatus = self.1.clone();
-//                     match event {
-//                         Event::AddedToBackpack(_, _) | Event::RemovedFromBackpack(_, _) => {
-//                             let newBack = self.get_backpack();
-//                             let newBackContent = newBack.get_contents();
-//                             let newInside: HashMap<Content, usize> = (newBackContent.iter())
-//                                 .map(|content| (content.0.to_owned(), content.1.to_owned()))
-//                                 .collect();
-//                             // HERE Implement the code to update a state inside the ai function component with the value of backpack size and content
-//                             backStatus.set(BackpackState {
-//                                 size: newBack.get_size(),
-//                                 content: newInside,
-//                             });
-//                         }
-//                         Event::Moved(newTile, (coord1, coord2)) => {
-//                             self.3.set(RobotState {
-//                                 coord: (coord1, coord2),
-//                                 energy: self.3.energy.clone()
-//                             });
-//                         }
-//                         // Event::Ready => todo!(),
-//                         // Event::Terminated => todo!(),
-//                         Event::TimeChanged(newEnviromentalConds) => {
-//                             let worldStatus = self.2.clone();
-//                             worldStatus.set(WorldState { world: worldStatus.world.clone(), enviromentalConditions: newEnviromentalConds })
-//                         },
-//                         Event::DayChanged(newEnviromentalConds) => {
-//                             let worldStatus = self.2.clone();
-//                             worldStatus.set(WorldState { world: worldStatus.world.clone(), enviromentalConditions: newEnviromentalConds })
-//                         },
-//                         Event::EnergyRecharged(_) => {
-//                             let robotStatus = self.3.clone();
-//                             robotStatus.set(RobotState {coord: robotStatus.coord, energy: self.get_energy().get_energy_level()});
-//                         },
-//                         Event::EnergyConsumed(_) => {
-//                             let robotStatus = self.3.clone();
-//                             robotStatus.set(RobotState {coord: robotStatus.coord, energy: self.get_energy().get_energy_level()});
-//                         },
-//                         Event::TileContentUpdated(_, _) => {
-//                             let msg = JsValue::from(format!(
-//                                 "Updated Coords: {:?}",
-//                                 self.get_coordinate()
-//                             ));
-//                             info!("{}", msg.as_string().unwrap());
-//                         }
-//                         _ => println!("Before"),
-//                     };
-
-//                     println!();
-//                 }
-
-//                 fn get_energy(&self) -> &Energy {
-//                     &self.0.energy
-//                 }
-//                 fn get_energy_mut(&mut self) -> &mut Energy {
-//                     &mut self.0.energy
-//                 }
-
-//                 fn get_coordinate(&self) -> &Coordinate {
-//                     &self.0.coordinate
-//                 }
-//                 fn get_coordinate_mut(&mut self) -> &mut Coordinate {
-//                     &mut self.0.coordinate
-//                 }
-
-//                 fn get_backpack(&self) -> &BackPack {
-//                     &self.0.backpack
-//                 }
-//                 fn get_backpack_mut(&mut self) -> &mut BackPack {
-//                     &mut self.0.backpack
-//                 }
-//             }
-
-//             // RUNNING THE GAME
-//             let r = MyRobot(
-//                 Robot::new(),
-//                 backState.clone(),
-//                 world_state.clone(),
-//                 robotState.clone(),
-//             );
-//             struct Tool;
-//             impl Tools for Tool {}
-//             // let mut generator = WorldGenerator::init(4);
-//             let mut generator = WorldgeneratorUnwrap::init(false, Some(PathBuf::from("world.bin")));
-//             let run = Runner::new(Box::new(r), &mut generator);
-//             //Known bug: 'check_world' inside 'Runner::new()' fails every time
-//             println!("AO");
-//             use_timeout(move || {
-//             match run {
-//                 Ok(mut r) => {
-//                     for _ in 0..100 {
-//                         let _ = &mut r.game_tick();
-//                         let tmpCoords = r.get_robot().get_coordinate();
-//                         let msg = JsValue::from(format!("Coords: {:?} Robot inside coords: {:?}", tmpCoords, robotState.coord));
-                        
-//                         info!("{}", msg.as_string().unwrap());
-//                         // robotics_lib::interface::
-//                     }
-//                 }
-//                 Err(e) => println!("{:?}", e),
-//             }
-//         }, 100);
-//             || println!("Done!")
-//         });
-//     }
-//     html! {
-//         <></>
-//     }
-// }
 
 #[function_component(BackP)]
 pub fn backpack() -> Html {
@@ -399,7 +163,7 @@ pub struct BackItemProps {
 
 #[function_component(BackItem)]
 fn backItem(props: &BackItemProps) -> Html {
-    let img_display: String = contentMatch(&props.content);
+    let img_display: String = content_match(&props.content);
     html! {
         <div class={classes!("back_item")}>
             <img  src={img_display}/>
@@ -409,16 +173,38 @@ fn backItem(props: &BackItemProps) -> Html {
     }
 }
 
-#[derive(PartialEq, Atom, Clone)]
-struct CustomTimer {
-    time: usize,
+#[function_component(EnergyBar)]
+fn energy_display() -> Html {
+    let energy_amount = use_atom::<EnergyState>();
+
+    html! {
+        <div id="energy">
+            <img src={"https://hotemoji.com/images/emoji/2/1gy0ubymkz6p2.png"}/>
+            <h3>{&energy_amount.energy}</h3>
+        </div>
+    }
 }
 
-impl Default for CustomTimer {
-    fn default() -> Self {
-        Self {
-            time: 0,
-        }
+#[function_component(EnviromentBar)]
+fn enviroment_display() -> Html {
+    let enviroment_state = use_atom::<EnviromentalState>();
+    let forecast_image = match_forecast(&enviroment_state.forecast);
+
+    html! {
+        <div id="enviroment">
+            <img src={forecast_image} />
+            <h3>{format!("{}", &enviroment_state.time)}</h3>
+        </div>
+    }
+}
+
+fn match_forecast(conditions: &WeatherType) -> String {
+    match conditions {
+        WeatherType::Sunny => "https://www.pngall.com/wp-content/uploads/2016/07/Sun-PNG-Image-180x180.png".to_string(),
+        WeatherType::Rainy => "https://borregowildflowers.org/img_sys/rain.png".to_string(),
+        WeatherType::Foggy => "https://cdn-icons-png.flaticon.com/128/2076/2076827.png".to_string(),
+        WeatherType::TropicalMonsoon => "https://heat-project.weebly.com/uploads/7/1/4/2/71428073/published/bez-nazxdccwy-1_1.png?1533897845".to_string(),
+        WeatherType::TrentinoSnow => "https://cdn.icon-icons.com/icons2/33/PNG/128/snow_cloud_weather_2787.png".to_string(),
     }
 }
 
@@ -426,43 +212,9 @@ impl Default for CustomTimer {
 pub fn map_view() -> Html {
     let world_state = use_atom::<WorldState>();
     let robotState = use_atom::<RobotState>();
-    let version = use_atom::<CustomTimer>();
-
-    // Ref to store the timeout task
-    // let timeout_task = use_mut_ref(|| None);
-
-    // Update the world state periodically
-    // {
-    //     let world_state = world_state.clone();
-    //     let version = version.clone();
-    //     use_effect(move || {
-    //         // Set up the timeout to periodically update the world state
-    //         info!("RERENDERRRRR n.{}  WORLD: {:?}  ", version.time.clone(), world_state.world.clone());
-    //         let handle = Timeout::new(100, move || {
-    //                 // Update the world state here
-    //                 // For example, you might fetch new data from the server
-    //                 // or run some logic to update the state
-    //                 // world_state.set(WorldState {world: world_state.world.clone(), enviromentalConditions: world_state.enviromentalConditions.clone()}); // Set the new world state
-    //                 version.set(CustomTimer {time: version.time.clone() +1,});
-    //             },
-    //         );
-
-    //         // Store the timeout task in the ref
-    //         *timeout_task.borrow_mut() = Some(handle);
-
-    //         // Cleanup function to cancel the timeout when the component unmounts
-    //         move || {
-    //             if let Some(task) = timeout_task.borrow_mut().take() {
-    //                 task.cancel();
-    //             }
-    //         }
-    //     });
-    // }
 
     html! {
         <div id={"robot_view"}>
-            <h2>{"Map"}</h2>
-            <br/>
             {for world_state.world.clone().iter().enumerate().map(|(i, row)| {
                 html! {
                     < div class={classes!("map_row")}>
@@ -478,15 +230,15 @@ pub fn map_view() -> Html {
                                     }}
                                     </div>
                                     },
-                                None => html! {<></>},
+                                None => html! {
+                                    // <></>
+                                    <div class={classes!("tile")} style={"width: var(--tile-size); height: var(--tile-size); background-color: var(--background-color);"}></div>
+                                },
                             }
                         })}
                     </div>
                 }
             })}
-            <div>
-                {format!("Conditions: {:?}", &world_state.enviromentalConditions)}
-            </div>
         </div>
     }
 }
@@ -523,7 +275,7 @@ pub fn map_tile(props: &MapTileProps) -> Html {
 
 #[function_component(MapTileContent)]
 pub fn map_tile_content(props: &MapTileProps) -> Html {
-    let img_display: String = contentMatch(&props.tile.content);
+    let img_display: String = content_match(&props.tile.content);
     if img_display == "" {
         html! {<></>}
     } else {
@@ -534,7 +286,7 @@ pub fn map_tile_content(props: &MapTileProps) -> Html {
     
 }
 
-fn contentMatch(input: &Content) -> String {
+fn content_match(input: &Content) -> String {
     match input {
         Rock(_) =>return  "https://media.forgecdn.net/avatars/84/877/636198378292789888.png".to_string(),
         Tree(_) =>return  "https://minecraft.wiki/images/thumb/Azalea_Tree.png/250px-Azalea_Tree.png?945ad".to_string(),
@@ -565,6 +317,8 @@ pub(crate) struct Jerry{
     pub(crate) bps: UseAtomHandle<BackpackState>,
     pub(crate) ws: UseAtomHandle<WorldState>,
     pub(crate) rs: UseAtomHandle<RobotState>,
+    pub(crate) env: UseAtomHandle<EnviromentalState>,
+    pub(crate) en: UseAtomHandle<EnergyState>,
     pub(crate) tick_counter: usize,
     pub(crate) world_dim: usize,
     pub(crate) active_region: ActiveRegion,
@@ -583,11 +337,12 @@ pub fn timo_ai() -> Html {
     let backState = use_atom::<BackpackState>();
     let world_state = use_atom::<WorldState>();
     let robotState = use_atom::<RobotState>();
+    let env_state = use_atom::<EnviromentalState>();
+    let energy_state = use_atom::<EnergyState>();
 
     let msg = JsValue::from(format!("Ai Running"));
     info!("{}", msg.as_string().unwrap());
     // let runner_ref = use_state_eq(|| None); timeout_jerry
-    let timeout_handle = use_mut_ref(|| None::<Timeout>);
     {
         impl Runnable for Jerry {
             fn process_tick(&mut self, world: &mut World) {
@@ -600,16 +355,24 @@ pub fn timo_ai() -> Html {
                     
                     // Update UI State
                     let tmpMap = robot_map(&world).unwrap_or_default();
-                    info!("{:?} It's been a long way...",tmpMap);
-                    let status = self.ws.clone();
+                    let tmp_conditions = look_at_sky(&world);
+                    info!("{:?} Internal Map",tmpMap);
                     if tmpMap != self.ws.world {
-                        status.set(WorldState {
+                        self.ws.set(WorldState {
                             world: tmpMap,
-                            enviromentalConditions: status.enviromentalConditions.clone(),
-                            counter: status.counter.clone() +1
+                            counter: self.ws.counter.clone() +1
                         });
-                        info!("CHANGED STATE");
+                        // info!("CHANGED WORLD");
                     }
+                    let tmp_time = tmp_conditions.get_time_of_day_string();
+                    if self.env.time != tmp_time{
+                    self.env.set(EnviromentalState { 
+                        forecast: tmp_conditions.get_weather_condition(),
+                        time: tmp_time,
+                     });
+                    }
+                    // info!("CHANGED CONDITIONS");
+
             }
 
             fn handle_event(&mut self, event: Event) {
@@ -617,7 +380,7 @@ pub fn timo_ai() -> Html {
                 println!("{:?}", event);
                 // Logs the event to the console
                 let msg = JsValue::from(format!("{:?}", event));
-                info!("[ EVENT ]{}", msg.as_string().unwrap());
+                // info!("[ EVENT ]{}", msg.as_string().unwrap());
                 // Backpack Updates
                 match event {
                     Event::AddedToBackpack(_, _) | Event::RemovedFromBackpack(_, _) => {
@@ -627,10 +390,14 @@ pub fn timo_ai() -> Html {
                             .map(|content| (content.0.to_owned(), content.1.to_owned()))
                             .collect();
                         // HERE Implement the code to update a state inside the ai function component with the value of backpack size and content
-                        self.bps.set(BackpackState {
-                            size: newBack.get_size(),
-                            content: newInside,
-                        });
+                        if self.bps.content != newInside {
+                            self.bps.set(BackpackState {
+                                size: newBack.get_size(),
+                                content: newInside,
+                            });
+                            info!("[ State Update ] New Backpack State");
+                        }
+                        
                     }
                     Event::Moved(_, position) => {
                         if position.0 >= self.active_region.bottom_right.0 {
@@ -646,7 +413,7 @@ pub fn timo_ai() -> Html {
                             self.active_region.top_left.1 = if position.1 == 0 { 0 } else { position.1 - 1 };
                         }
                         let tmp_coords = self.get_coordinate();
-                        info!("NEW COOOOOOORDS{:?}", tmp_coords);
+                        // info!("[ State Update ] NEW COORDS: {:?}", tmp_coords);
                         self.rs.set(RobotState {
                             coord: (tmp_coords.get_row(), tmp_coords.get_col()),
                             // energy: self.rs.energy.clone()
@@ -659,25 +426,19 @@ pub fn timo_ai() -> Html {
                     //     worldStatus.set(WorldState { world: worldStatus.world.clone(), enviromentalConditions: newEnviromentalConds })
                     // },
                     // Event::DayChanged(newEnviromentalConds) => {
-                    //     let worldStatus = self.ws.clone();
-                    //     worldStatus.set(WorldState { world: worldStatus.world.clone(), enviromentalConditions: newEnviromentalConds })
+                        
                     // },
-                    Event::EnergyRecharged(_) => {
+                    Event::EnergyRecharged(_) | Event::EnergyConsumed(_) => {
                         // let robotStatus = self.rs.clone();
                         // robotStatus.set(RobotState {coord: robotStatus.coord, energy: self.get_energy().get_energy_level()});
+                        let tmp_energy = self.get_energy().get_energy_level();
+                        if self.en.energy != tmp_energy {
+                            self.en.set(EnergyState {
+                                energy: tmp_energy,
+                            })
+                        }
                     },
-                    Event::EnergyConsumed(_) => {
-                        // let robotStatus = self.rs.clone();
-                        // robotStatus.set(RobotState {coord: robotStatus.coord, energy: self.get_energy().get_energy_level()});
-                    },
-                    Event::TileContentUpdated(_, _) => {
-                        let msg = JsValue::from(format!(
-                            "Updated Coords: {:?}",
-                            self.get_coordinate()
-                        ));
-                        info!("{}", msg.as_string().unwrap());
-                    }
-                    _ => println!("Before"),
+                    _ => (),
                 };
 
                 println!();
@@ -717,6 +478,8 @@ pub fn timo_ai() -> Html {
             bps: backState.clone(),
             ws: world_state.clone(),
             rs: robotState.clone(),
+            env: env_state.clone(),
+            en: energy_state.clone(),
             tick_counter: 0,
             world_dim: 0,
             active_region: ActiveRegion{
@@ -736,30 +499,12 @@ pub fn timo_ai() -> Html {
             let mut generator = WorldgeneratorUnwrap::init(false, Some(PathBuf::from("world.bin")));
             let run = Rc::new(RefCell::new(Runner::new(Box::new(r), &mut generator)));
             
-
-        use_effect(move || {
-            // Setup world
-            let _timeout_handle = timeout_handle.clone();
-            let _runner_result = run.clone();
-            
-            wasm_bindgen_futures::spawn_local(async move {
-                let _done = run_game(run).await;
-            });
-            //Known bug: 'check_world' inside 'Runner::new()' fails every time
-            info!("RERUNNING TICK");
-
-            // *timeout_handle.borrow_mut() = Some(Timeout::new(1000, move || {
-            //     for _  in 0..10000 {
-            //         // Get a mutable reference to the Result<Runner>
-                    
-            //         // Handle the Result using map and map_err
-                    
-            //     }
-                
-            // }));
-
-            || {};
-        });
+            if world_state.counter == 0 {
+                info!("STARTING GAME...");
+                wasm_bindgen_futures::spawn_local(async move {
+                    let _done = run_game(run).await;
+                });
+            }
     }
     html! {
         <></>
@@ -770,11 +515,10 @@ pub fn timo_ai() -> Html {
 
 
     async fn run_game(run: Rc<RefCell<Result<Runner, LibError>>>) -> () {
-        // let _ = Delay::new(Duration::from_secs(1)).await;
-        
+        sleep(3000).await;
         for _  in 0..10000 {
-            sleep(5000).await;
-            info!("Cook buddy!");
+            sleep(1).await;
+            info!("[ RUNNER ] Tick");
             // Get a mutable reference to the Result<Runner>
             let mut runner_result = run.borrow_mut();
             // Handle the Result using map and map_err
@@ -782,17 +526,16 @@ pub fn timo_ai() -> Html {
                 // runner is now a mutable reference to the Runner
                 let _ = runner.game_tick();
                 let _robot_coordinate = runner.get_robot().get_coordinate();
-                // info!("LOST SOULSSSS   {:?} {:?}", world_state.world.clone(), robot_coordinate);
             }).map_err(|e| {
-                info!("[ SEVERE ] ERROR WITH RUN: {:?}", e);
+                info!("[ RUNNER ] ERROR WITH RUN: {:?}", e);
             }).unwrap_or_else(|_| {
-                // Handle the case where the Result is an Err
-                // This could be a no-op or some error handling code
+                info!("[ RUNNER ] ERROR WITH RUN. ");
             });
         }
     }
 
 
+    // Custom sleep function to support the web
     async fn sleep(duration: u32) {
         let promise = js_sys::Promise::new(&mut |resolve, _| {
             window()

@@ -24,7 +24,7 @@ fn app() -> Html {
         <BounceRoot>
             // <h1>{ "Robot" }</h1>
             <Main/>
-            // <ActivateAi/>
+            // This next line chooses which AI to start
             <TimoAi />
         </BounceRoot>
         
