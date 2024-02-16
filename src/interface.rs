@@ -582,6 +582,612 @@ pub fn timo_ai() -> Html {
     }
 }
 
+//NICO CODE
+pub(crate) struct MyRobot {
+        pub(crate) robot: Robot,
+        pub(crate) bps: UseAtomHandle<BackpackState>,
+        pub(crate) ws: UseAtomHandle<WorldState>,
+        pub(crate) rs: UseAtomHandle<RobotState>,
+        pub(crate) env: UseAtomHandle<EnviromentalState>,
+        pub(crate) en: UseAtomHandle<EnergyState>
+    }
+
+#[function_component(NicoAi)]
+pub fn nico_ai() -> Html {
+    let backState = use_atom::<BackpackState>();
+    let world_state = use_atom::<WorldState>();
+    let robotState = use_atom::<RobotState>();
+    let env_state = use_atom::<EnviromentalState>();
+    let energy_state = use_atom::<EnergyState>();
+
+    let msg = JsValue::from(format!("Ai Running"));
+    info!("{}", msg.as_string().unwrap());
+
+   
+
+//     //for i in 0..1000 {
+//     runner.game_tick();
+// //             Ok(..) => {},
+// //             Err(e) => println!("{:?}", e.to_string())
+// //         }
+// //     }
+
+
+    impl Runnable for MyRobot {
+        fn process_tick(&mut self, world: &mut World) {
+            let mut w = WeatherPredictionTool::new();
+            println!("Weather prediction for next tick! The desert will experience a {:?} day! We should get everything done before that!",
+                     WeatherPredictionTool::predict(&mut w, 1).unwrap_or(Sunny));
+            call(self, world, "rock", 0);
+            let tmpMap = robot_map(&world).unwrap_or_default();
+            let tmp_conditions = look_at_sky(&world);
+            info!("{:?} Internal Map",tmpMap);
+            if tmpMap != self.ws.world {
+                self.ws.set(WorldState {
+                    world: tmpMap,
+                    counter: self.ws.counter.clone() + 1
+                });
+                // info!("CHANGED WORLD");
+            }
+            let tmp_time = tmp_conditions.get_time_of_day_string();
+            if self.env.time != tmp_time {
+                self.env.set(EnviromentalState {
+                    forecast: tmp_conditions.get_weather_condition(),
+                    time: tmp_time,
+                });
+            }
+            // info!("CHANGED CONDITIONS");
+        }
+
+        fn handle_event(&mut self, event: Event) {
+            println!("event: {:?}", event.to_string());
+            let msg = JsValue::from(format!("{:?}", event));
+            // info!("[ EVENT ]{}", msg.as_string().unwrap());
+            // Backpack Updates
+            match event {
+                Event::AddedToBackpack(_, _) | Event::RemovedFromBackpack(_, _) => {
+                    let newBack = self.get_backpack();
+                    let newBackContent = newBack.get_contents();
+                    let newInside: HashMap<Content, usize> = (newBackContent.iter())
+                        .map(|content| (content.0.to_owned(), content.1.to_owned()))
+                        .collect();
+                    // HERE Implement the code to update a state inside the ai function component with the value of backpack size and content
+                    if self.bps.content != newInside {
+                        self.bps.set(BackpackState {
+                            size: newBack.get_size(),
+                            content: newInside,
+                        });
+                        info!("[ State Update ] New Backpack State");
+                    }
+
+                }
+                Event::Moved(_, _) => {
+                    let tmp_coords = self.get_coordinate();
+                    // info!("[ State Update ] NEW COORDS: {:?}", tmp_coords);
+                    self.rs.set(RobotState {
+                        coord: (tmp_coords.get_row(), tmp_coords.get_col()),
+                        // energy: self.rs.energy.clone()
+                    });
+                },
+                // Event::Ready => todo!(),
+                // Event::Terminated => todo!(),
+                // Event::TimeChanged(newEnviromentalConds) => {
+                //     let worldStatus = self.ws.clone();
+                //     worldStatus.set(WorldState { world: worldStatus.world.clone(), enviromentalConditions: newEnviromentalConds })
+                // },
+                // Event::DayChanged(newEnviromentalConds) => {
+
+                // },
+                Event::EnergyRecharged(_) | Event::EnergyConsumed(_) => {
+                    // let robotStatus = self.rs.clone();
+                    // robotStatus.set(RobotState {coord: robotStatus.coord, energy: self.get_energy().get_energy_level()});
+                    let tmp_energy = self.get_energy().get_energy_level();
+                    if self.en.energy != tmp_energy {
+                        self.en.set(EnergyState {
+                            energy: tmp_energy,
+                        })
+                    }
+                },
+                _ => (),
+            };
+
+            println!();
+        }
+
+        fn get_energy(&self) -> &Energy {
+            &self.robot.energy
+        }
+
+        fn get_energy_mut(&mut self) -> &mut Energy {
+            &mut self.robot.energy
+        }
+
+        fn get_coordinate(&self) -> &Coordinate {
+            &self.robot.coordinate
+        }
+
+        fn get_coordinate_mut(&mut self) -> &mut Coordinate {
+            &mut self.robot.coordinate
+        }
+
+        fn get_backpack(&self) -> &BackPack {
+            &self.robot.backpack
+        }
+
+        fn get_backpack_mut(&mut self) -> &mut BackPack {
+            &mut self.robot.backpack
+        }
+    }
+
+    let robotz = MyRobot {
+        robot: Robot::new(),
+        bps: backState.clone(),
+        ws: world_state.clone(),
+        rs: robotState.clone(),
+        env: env_state.clone(),
+        en: energy_state.clone()
+    };
+    let mut worldgen = WorldgeneratorUnwrap::init(false, Some(PathBuf::from("nworld.bin")));
+    let mut runner = Rc::new(RefCell::new(Runner::new(Box::new(robotz), &mut worldgen)));
+
+    if world_state.counter == 0 {
+        info!("STARTING GAME...");
+        wasm_bindgen_futures::spawn_local(async move {
+            let _done = run_game(runner).await;
+        });
+    }
+
+    
+    fn rock(robot: &mut impl Runnable, world: &mut World) {
+        recharge(robot);
+        while robot.get_energy().has_enough_energy(10) {
+            match TomTom::go_to_tile(robot, world, false, None, Some(PlainContent::Rock)) {
+                Ok(path) => {
+                    recharge(robot);
+                    println!("A rock was found!");
+                    TomTom::go_to_tile(robot, world, false, None, Some(PlainContent::Rock));
+                    go(robot, world, Direction::Down);
+                    match bessie::bessie::road_paving_machine(
+                        robot,
+                        world,
+                        Direction::Up,
+                        bessie::bessie::State::GetStones) {
+                        Ok(b) => println!("{:?}", b),
+                        Err(e) => {
+                            match e {
+                                RpmError::UndefinedError => call(robot, world, "street", 1),
+                                _ => println!("{:?}", e)
+                            }
+                        }
+                    }
+                },
+
+                _ =>
+                    {
+                        random_movement(robot, world, 'r');
+                    }
+            }
+        }
+    }
+
+   
+    fn street_paving_mode(robot: &mut impl Runnable, world: &mut World, cycle: i32) {
+        println!("Let's build some roads");
+        recharge(robot);
+        while !robot.get_backpack().get_contents().is_empty() {
+            match cycle {
+                1 => {
+                    for n in 1..=10 {
+                        if robot.get_coordinate().get_col() == 279 {
+                            recover_oob(robot, world, Direction::Right);
+                            street_paving_mode(robot, world, cycle);
+                            break;
+                        }
+                        match destroy(robot, world, Direction::Right) {
+                            Err(e) => {
+                                recover_oob(robot, world, Direction::Right);
+                                if go_allowed(robot, world, &Direction::Left).is_ok() { go(robot, world, Direction::Left); } else {
+                                    street_paving_mode(robot, world, cycle * -1);
+                                }
+                                match bessie::bessie::road_paving_machine(
+                                    robot,
+                                    world,
+                                    Direction::Right,
+                                    bessie::bessie::State::MakeRoad) {
+                                    Err(RpmError::CannotPlaceHere) => {
+                                        recover_oob(robot, world, Direction::Right);
+                                        if go_allowed(robot, world, &Direction::Left).is_ok() { go(robot, world, Direction::Left); } else {
+                                            street_paving_mode(robot, world, cycle * -1);
+                                        }
+                                        street_paving_mode(robot, world, cycle);
+                                        break;
+                                    },
+                                    Ok(p) => println!("{:?}", p),
+                                    _ => {
+                                        street_paving_mode(robot, world, -1);
+                                        break;
+                                    }
+                                }
+                            },
+                            _ => {
+                                for (key, value) in robot.get_backpack().get_contents().clone() {
+                                    if key == Content::Garbage(0) {
+                                        if value == 0usize {
+                                            recover_oob(robot, world, Direction::Right);
+                                            if go_allowed(robot, world, &Direction::Left).is_ok() { go(robot, world, Direction::Left); } else {
+                                                street_paving_mode(robot, world, cycle * -1);
+                                            }
+                                            println!("{:?}",
+                                                     bessie::bessie::road_paving_machine(
+                                                         robot,
+                                                         world,
+                                                         Direction::Right,
+                                                         bessie::bessie::State::MakeRoad
+                                                     )
+                                            );
+                                            break;
+                                        } else {
+                                            call(robot, world, "garbage", 0);
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    };
+                    if robot.get_coordinate().get_row() == 279 {
+                        recover_oob(robot, world, Direction::Down);
+                    }
+                    match destroy(robot, world, Direction::Down) {
+                        Err(e) => {
+                            recover_oob(robot, world, Direction::Down);
+                            if go_allowed(robot, world, &Direction::Up).is_ok() { go(robot, world, Direction::Up); } else {
+                                street_paving_mode(robot, world, cycle * -1);
+                            }
+                            match bessie::bessie::road_paving_machine(
+                                robot,
+                                world,
+                                Direction::Down,
+                                bessie::bessie::State::MakeRoad) {
+                                Err(RpmError::CannotPlaceHere) => {
+                                    recover_oob(robot, world, Direction::Down);
+                                    if go_allowed(robot, world, &Direction::Up).is_ok() { go(robot, world, Direction::Up); } else {
+                                        street_paving_mode(robot, world, cycle * -1);
+                                    }
+                                    street_paving_mode(robot, world, cycle);
+                                    break;
+                                },
+                                Ok(p) => println!("{:?}", p),
+                                _ => {
+                                    street_paving_mode(robot, world, -1);
+                                    break;
+                                }
+                            }
+                        },
+                        _ => {
+                            for (key, value) in robot.get_backpack().get_contents().clone() {
+                                if key == Content::Garbage(0) {
+                                    if value == 0usize {
+                                        recover_oob(robot, world, Direction::Down);
+                                        if go_allowed(robot, world, &Direction::Up).is_ok() { go(robot, world, Direction::Up); } else {
+                                            street_paving_mode(robot, world, cycle * -1);
+                                        }
+                                        println!("{:?}",
+                                                 bessie::bessie::road_paving_machine(
+                                                     robot,
+                                                     world,
+                                                     Direction::Down,
+                                                     bessie::bessie::State::MakeRoad
+                                                 )
+                                        );
+                                        break;
+                                    } else {
+                                        call(robot, world, "garbage", 0);
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                -1 => {
+                    for n in 1..=10 {
+                        if robot.get_coordinate().get_col() == 0 {
+                            recover_oob(robot, world, Direction::Left);
+                            street_paving_mode(robot, world, cycle);
+                            break;
+                        }
+                        match destroy(robot, world, Direction::Left) {
+                            Err(e) => {
+                                recover_oob(robot, world, Direction::Left);
+                                if go_allowed(robot, world, &Direction::Right).is_ok() { go(robot, world, Direction::Right); } else {
+                                    street_paving_mode(robot, world, cycle * -1);
+                                }
+                                match bessie::bessie::road_paving_machine(
+                                    robot,
+                                    world,
+                                    Direction::Left,
+                                    bessie::bessie::State::MakeRoad) {
+                                    Err(RpmError::CannotPlaceHere) => {
+                                        recover_oob(robot, world, Direction::Left);
+                                        if go_allowed(robot, world, &Direction::Right).is_ok() { go(robot, world, Direction::Right); } else {
+                                            street_paving_mode(robot, world, cycle * -1);
+                                        }
+                                        street_paving_mode(robot, world, cycle);
+                                        break;
+                                    },
+                                    Ok(p) => println!("{:?}", p),
+                                    _ => {
+                                        street_paving_mode(robot, world, -1);
+                                        break;
+                                    }
+                                }
+                            },
+                            _ => {
+                                for (key, value) in robot.get_backpack().get_contents().clone() {
+                                    if key == Content::Garbage(0) {
+                                        if value == 0usize {
+                                            recover_oob(robot, world, Direction::Left);
+                                            if go_allowed(robot, world, &Direction::Right).is_ok() { go(robot, world, Direction::Right); } else {
+                                                street_paving_mode(robot, world, cycle * -1);
+                                            }
+                                            println!("{:?}",
+                                                     bessie::bessie::road_paving_machine(
+                                                         robot,
+                                                         world,
+                                                         Direction::Left,
+                                                         bessie::bessie::State::MakeRoad
+                                                     )
+                                            );
+                                            break;
+                                        } else {
+                                            call(robot, world, "garbage", 0);
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    };
+                    if robot.get_coordinate().get_row() == 279 {
+                        recover_oob(robot, world, Direction::Down);
+                    }
+                    match destroy(robot, world, Direction::Down) {
+                        Err(e) => {
+                            recover_oob(robot, world, Direction::Down);
+                            if go_allowed(robot, world, &Direction::Up).is_ok() { go(robot, world, Direction::Up); } else {
+                                street_paving_mode(robot, world, cycle * -1);
+                            }
+                            match bessie::bessie::road_paving_machine(
+                                robot,
+                                world,
+                                Direction::Down,
+                                bessie::bessie::State::MakeRoad) {
+                                Err(RpmError::CannotPlaceHere) => {
+                                    recover_oob(robot, world, Direction::Down);
+                                    if go_allowed(robot, world, &Direction::Up).is_ok() { go(robot, world, Direction::Up); } else {
+                                        street_paving_mode(robot, world, cycle * -1);
+                                    }
+                                    street_paving_mode(robot, world, cycle);
+                                    break;
+                                },
+                                Ok(p) => println!("{:?}", p),
+                                _ => {
+                                    street_paving_mode(robot, world, -1);
+                                    break;
+                                }
+                            }
+                        },
+                        _ => {
+                            for (key, value) in robot.get_backpack().get_contents().clone() {
+                                if key == Content::Garbage(0) {
+                                    if value == 0usize {
+                                        recover_oob(robot, world, Direction::Down);
+                                        if go_allowed(robot, world, &Direction::Up).is_ok() { go(robot, world, Direction::Up); } else {
+                                            street_paving_mode(robot, world, cycle * -1);
+                                        }
+                                        println!("{:?}",
+                                                 bessie::bessie::road_paving_machine(
+                                                     robot,
+                                                     world,
+                                                     Direction::Down,
+                                                     bessie::bessie::State::MakeRoad
+                                                 )
+                                        );
+                                        break;
+                                    } else {
+                                        call(robot, world, "garbage", 0);
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                },
+                _ => {}
+            };
+        }
+        call(robot, world, "rock", 0);
+    }
+
+   
+    fn garbage(robot: &mut impl Runnable, world: &mut World) {
+        println!("Oh no, That's garbage! Let's clean this place!");
+        while robot.get_energy().has_enough_energy(10) {
+            recharge(robot);
+            match TomTom::go_to_tile(robot, world, false, None, Some(PlainContent::Garbage)) {
+                Ok(path) => {
+                    println!("Garbage was found!");
+                    TomTom::go_to_tile(robot, world, false, None, Some(PlainContent::Garbage));
+                    go(robot, world, Direction::Down);
+                    destroy(robot, world, Direction::Up);
+                    for (key, value) in robot.get_backpack().get_contents().clone() {
+                        if key == Content::Garbage(0) {
+                            if value == 10 {
+                                println!("We found 10 pieces, let's go throw them out");
+                                collect_garbage(robot, world);
+                                break;
+                            }
+                        }
+                    }
+                },
+
+                _ =>
+                    {
+                        random_movement(robot, world, 'g');
+                    }
+            }
+        }
+    }
+
+    
+    fn collect_garbage(robot: &mut impl Runnable, world: &mut World) {
+        let task = Goal::new("Garbage Man".to_string(), "Dispose of the 10 garbage pieces".to_string(),
+                             GoalType::ThrowGarbage, Some(Content::Garbage(0)), 10);
+        let mut tracker = GoalTracker::new();
+        tracker.add_goal(task);
+        println!("{:?}", tracker.get_goals().clone());
+        match TomTom::go_to_tile(robot, world, false, None, Some(PlainContent::Bin)) {
+            Ok(path) => {
+                println!("There's a bin!");
+                TomTom::go_to_tile(robot, world, false, None, Some(PlainContent::Bin));
+                go(robot, world, Direction::Down);
+                match throw_garbage(robot, world, Content::Garbage(0), 10, Direction::Up, &mut tracker) {
+                    Ok(..) => {
+                        if tracker.get_completed_number() == 1 {
+                            println!("{:?}", tracker.get_goals());
+                            call(robot, world, "rock", 0);
+                            //exit(0)
+                        } else {
+                            recharge(robot);
+                            random_movement(robot, world, 'c');
+                        }
+                    },
+                    Err(..) => {
+                        collect_garbage(robot, world);
+                    }
+                };
+            },
+            Err(e) => {
+                random_movement(robot, world, 'c');
+            }
+        }
+    }
+
+    
+    fn call(robot: &mut impl Runnable, world: &mut World, key: &str, streetcycle: i32) {
+        recharge(robot);
+        match key {
+            "rock" => rock(robot, world),
+            "street" => street_paving_mode(robot, world, streetcycle),
+            "garbage" => garbage(robot, world),
+            _ => println!("invalid function call"),
+        }
+    }
+    fn recharge(robot: &mut impl Runnable) {
+        *robot.get_energy_mut() = Dynamo::update_energy();
+    }
+    fn random_movement(robot: &mut impl Runnable, world: &mut World, key: char) {
+        let num = rand::thread_rng().gen_range(0..=100);
+        match num {
+            0..=25 => {
+                if go_allowed(robot, world, &Direction::Left).is_ok() {
+                    go(robot, world, Direction::Left);
+                    match key {
+                        'c' => collect_garbage(robot, world),
+                        'g' => garbage(robot, world),
+                        'r' => rock(robot, world),
+                        _ => {}
+                    }
+                } else {
+                    random_movement(robot, world, key);
+                }
+            },
+            26..=50 => {
+                if go_allowed(robot, world, &Direction::Right).is_ok() {
+                    go(robot, world, Direction::Right);
+                    match key {
+                        'c' => collect_garbage(robot, world),
+                        'g' => garbage(robot, world),
+                        'r' => rock(robot, world),
+                        _ => {}
+                    }
+                } else {
+                    random_movement(robot, world, key);
+                }
+            },
+            51..=75 => {
+                if go_allowed(robot, world, &Direction::Up).is_ok() {
+                    go(robot, world, Direction::Up);
+                    match key {
+                        'c' => collect_garbage(robot, world),
+                        'g' => garbage(robot, world),
+                        'r' => rock(robot, world),
+                        _ => {}
+                    }
+                } else {
+                    random_movement(robot, world, key);
+                }
+            },
+            76..=100 => {
+                if go_allowed(robot, world, &Direction::Down).is_ok() {
+                    go(robot, world, Direction::Down);
+                    match key {
+                        'c' => collect_garbage(robot, world),
+                        'g' => garbage(robot, world),
+                        'r' => rock(robot, world),
+                        _ => {}
+                    }
+                } else {
+                    random_movement(robot, world, key);
+                }
+            },
+            _ => random_movement(robot, world, key),
+        }
+    }
+    fn recover_oob(robot: &mut impl Runnable, world: &mut World, d: Direction) {
+        match d {
+            Direction::Up => {
+                if robot.get_coordinate().get_row() == 0 {
+                    println!("Watch out!");
+                    go(robot, world, Direction::Down);
+                    go(robot, world, Direction::Down);
+                    recharge(robot);
+                }
+            },
+            Direction::Down => {
+                if robot.get_coordinate().get_row() == 279 {
+                    println!("Watch out!");
+                    go(robot, world, Direction::Up);
+                    go(robot, world, Direction::Up);
+                    recharge(robot);
+                }
+            },
+            Direction::Right => {
+                if robot.get_coordinate().get_col() == 279 {
+                    println!("Watch out!");
+                    go(robot, world, Direction::Left);
+                    go(robot, world, Direction::Left);
+                    recharge(robot);
+                }
+            },
+            Direction::Left => {
+                if robot.get_coordinate().get_col() == 0 {
+                    println!("Watch out!");
+                    go(robot, world, Direction::Right);
+                    go(robot, world, Direction::Right);
+                    recharge(robot);
+                }
+            }
+        }
+    }
+    html! {
+        <></>
+    }
+}
+
+
+
 async fn run_game(run: Rc<RefCell<Result<Runner, LibError>>>) -> () {
     sleep(3000).await;
     for _ in 0..10000 {
@@ -615,5 +1221,7 @@ async fn sleep(duration: u32) {
             .unwrap();
     });
 
+
     let _ = JsFuture::from(promise).await;
 }
+
