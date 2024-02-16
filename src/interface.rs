@@ -27,6 +27,17 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use crate::explorer::new_explorer;
 use crate::utils::{calculate_spatial_index, execute_mission, get_world_dimension, ActiveRegion, Mission};
 use rust_and_furious_dynamo::dynamo::Dynamo;
+use bob_lib::tracker::*;
+use rust_eze_tomtom::plain::*;
+use robotics_lib::interface::destroy;
+
+// Nick extra imports
+use rand::Rng;
+use robotics_lib::interface::Direction;
+use robotics_lib::interface::go;
+use robotics_lib::utils::go_allowed;
+use bessie::bessie::*;
+use robotics_lib::world::environmental_conditions::WeatherType::*;
 
 // Frontend
 include!("worldloader.rs");

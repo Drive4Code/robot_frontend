@@ -13,7 +13,7 @@ pub mod sector_analyzer;
 pub mod road_builder;
 pub mod resources;
 
-use interface::{Main, TimoAi};
+use interface::{Main, TimoAi, NicoAi};
 
 #[function_component(App)]
 fn app() -> Html {
@@ -25,7 +25,8 @@ fn app() -> Html {
             // <h1>{ "Robot" }</h1>
             <Main/>
             // This next line chooses which AI to start
-            <TimoAi />
+            // <TimoAi />
+            <NicoAi />
         </BounceRoot>
         
         </>
