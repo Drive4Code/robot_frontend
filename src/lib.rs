@@ -10,6 +10,8 @@ pub mod explorer;
 pub mod morans_i;
 pub mod utils;
 pub mod sector_analyzer;
+pub mod road_builder;
+pub mod resources;
 
 use interface::{Main, TimoAi};
 
