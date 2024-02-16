@@ -721,6 +721,7 @@ pub fn nico_ai() -> Html {
                         Err(e) => {
                             match e {
                                 RpmError::UndefinedError => call(robot, world, "street", 1),
+                                 RpmError::NoRockHere => call(robot, world, "rock", 0),
                                 _ => println!("{:?}", e)
                             }
                         }
@@ -799,7 +800,8 @@ pub fn nico_ai() -> Html {
                                 }
                             }
                         }
-                    };
+                    }
+                    call(robot, world, "street", -1);
                     if robot.get_coordinate().get_row() == 279 {
                         recover_oob(robot, world, Direction::Down);
                     }
@@ -913,7 +915,8 @@ pub fn nico_ai() -> Html {
                                 }
                             }
                         }
-                    };
+                    }
+                    call(robot, world, "street", 1);
                     if robot.get_coordinate().get_row() == 279 {
                         recover_oob(robot, world, Direction::Down);
                     }
@@ -1021,8 +1024,8 @@ pub fn nico_ai() -> Html {
                     Ok(..) => {
                         if tracker.get_completed_number() == 1 {
                             println!("{:?}", tracker.get_goals());
-                            call(robot, world, "rock", 0);
-                            //exit(0)
+                            //call(robot, world, "rock", 0);
+                            exit(0)
                         } else {
                             recharge(robot);
                             random_movement(robot, world, 'c');
