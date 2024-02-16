@@ -1,27 +1,27 @@
 use core::panic;
 use std::collections::HashSet;
-use std::hash::Hash;
-use bessie::bessie::{road_paving_machine, RpmError, State};
+
+use bessie::bessie::{RpmError, State};
 use charting_tools::charted_map::MapKey;
 use rand::Rng;
-use robotics_lib::interface::{destroy, go, robot_map, teleport, where_am_i, Direction};
+use robotics_lib::interface::{destroy, robot_map, where_am_i, Direction};
 use robotics_lib::runner::Runnable;
-use robotics_lib::utils::{go_allowed, LibError};
+use robotics_lib::utils::{LibError};
 use robotics_lib::world::tile::{Content, Tile, TileType};
 use robotics_lib::world::World;
-use rust_and_furious_dynamo::dynamo::{self, Dynamo};
-use rust_eze_tomtom::{path, TomTom};
+use rust_and_furious_dynamo::dynamo::{Dynamo};
+use rust_eze_tomtom::{TomTom};
 use crate::explorer::{coordinate_to_direction, is_adjacent};
-use crate::resources::{self, empty_the_backpack, get_content, ResourceCollectorError};
+use crate::resources::{empty_the_backpack, get_content, ResourceCollectorError};
 use crate::interface::Jerry;
 use crate::sector_analyzer::SectorData;
-use crate::utils::{get_direction, JerryStatus};
+use crate::utils::{JerryStatus};
 use charting_tools::charted_coordinate::ChartedCoordinate;
 use charting_tools::charted_paths::{ChartedPaths};
 use charting_tools::ChartingTools;
 use crate::utils::Mission;
 use crate::utils::MissionStatus::Paused;
-use crate::utils::MissionStatus::Active;
+
 use crate::utils::MissionStatus::Completed;
 use crate::road_builder::RoadBuilderError::RoadNonAccessible;
 
@@ -29,7 +29,7 @@ use crate::road_builder::RoadBuilderError::RoadNonAccessible;
 //returns a vector of charted coordinates which is the sequence of tiles to go through
 //it also cuts the ends of the path if they are shallow water or deep water
 
-pub fn plan_road(jerry: &mut Jerry, world: &mut World, node1: (usize, usize), node2: (usize, usize)) -> Vec<ChartedCoordinate> {
+pub fn plan_road(_jerry: &mut Jerry, world: &mut World, node1: (usize, usize), node2: (usize, usize)) -> Vec<ChartedCoordinate> {
     let mut charted_paths  = ChartingTools::tool::<ChartedPaths>()
             .expect("too many tools used!");
     let map = robot_map(world).unwrap();
@@ -70,7 +70,7 @@ fn shrink_path(path: &mut Vec<ChartedCoordinate>, map: &Vec<Vec<Option<Tile>>>){
 //the function gets the sector data and adds new missions for the robot
 pub fn generate_road_builders(jerry: &mut Jerry, world: &mut World, sector_data: SectorData){
     let nodes = sector_data.nodes;
-    let resources = sector_data.resources;
+    let _resources = sector_data.resources;
     let mut missions = 0;
     let map = robot_map(world).unwrap();
      //if there is just one node
@@ -199,7 +199,7 @@ pub fn new_road_builder(path: &Vec<ChartedCoordinate>, connect_to: ConnectionSta
 //if it does, the function will skip a tile
 //if it contains a teleport, the function will teleport to that tile
 pub fn road_builder_execute(jerry: &mut Jerry, world: &mut World, mission_index: usize) -> Result<(), JerryStatus> {
-    let mut new_tick = true;
+    let new_tick = true;
     
     /*
         Following algorithm:
@@ -223,7 +223,7 @@ pub fn road_builder_execute(jerry: &mut Jerry, world: &mut World, mission_index:
         //initializing necessary tools and data
 
         let map = robot_map(world).unwrap();
-        let (robot_view, position) = where_am_i(jerry, world);
+        let (_robot_view, _position) = where_am_i(jerry, world);
         let mut charted_paths  = ChartingTools::tool::<ChartedPaths>()
             .expect("too many tools used!");
         charted_paths.init(&map, world);
@@ -396,7 +396,7 @@ fn bessie_controller(jerry: &mut Jerry, map: &Vec<Vec<Option<Tile>>>, world: &mu
             | RpmError::NoRockHere | RpmError::NotEnoughMaterial=> {
                 //need to search for rocks
                 //remember the current position to return back after the search using the vent tool waypoint
-                let current_position = (jerry.get_coordinate().get_row(), jerry.get_coordinate().get_col());
+                let _current_position = (jerry.get_coordinate().get_row(), jerry.get_coordinate().get_col());
                 vent_tool2.borrow_mut().create_waypoint(jerry, 1000);
                 let mission = jerry.missions.get_mut(mission_index).unwrap();
                 let road_builder_data = mission.additional_data.as_mut().unwrap().downcast_mut::<RoadBuilderData>().unwrap();
@@ -448,7 +448,7 @@ fn choose_tile_to_pave(jerry: &mut Jerry, tool: ChartedPaths, mission_index: usi
     let mut candidate_cost = 0;
     //iterate first over the last 10 added frontier tiles then 20 then 30 and so on
     while start > 0{
-        let end = start;
+        let _end = start;
         start = start.saturating_sub(search_depth);
 
         //candidate is the tile with the minimum cost to go to

@@ -76,7 +76,7 @@ pub fn analyzer_execute(world: &mut World, tl: (usize, usize), br: (usize, usize
            }
         }
     }
-    for (c, cores) in clusters.iter(){
+    for (_c, cores) in clusters.iter(){
         let mut centroid = get_centroid(cores);
         //turn the relative coordinates into absolute
         centroid.0 += tl.0;

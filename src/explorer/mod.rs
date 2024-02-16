@@ -136,7 +136,7 @@ pub fn explorer_execute(jerry: &mut Jerry, world: &mut World, mission_index: usi
             generate_road_builders(jerry, world, sector_data);
             jerry.active_region.top_left = tl;
             jerry.active_region.bottom_right = br;
-            let map = robot_map(world).unwrap();
+            let _map = robot_map(world).unwrap();
 
             return Ok(());
         }

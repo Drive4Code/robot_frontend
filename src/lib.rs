@@ -13,7 +13,7 @@ pub mod sector_analyzer;
 pub mod road_builder;
 pub mod resources;
 
-use interface::{Main, TimoAi, NicoAi};
+use interface::{Main, NicoAi};
 
 #[function_component(App)]
 fn app() -> Html {
