@@ -80,6 +80,11 @@ body {
   height: auto;
 }
 
+.tile_type {
+  width: var(--tile-size);
+  height: var(--tile-size);
+}
+
 #robot {
   position: absolute;
   top: 50%;

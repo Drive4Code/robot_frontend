@@ -3,15 +3,19 @@ use charting_tools::ChartingTools;
 use ohcrab_weather::weather_tool::WeatherPredictionTool;
 // Project imports
 use robotics_lib::energy::Energy;
-use robotics_lib::event::events::{Event};
+use robotics_lib::event::events::Event;
 use robotics_lib::interface::{look_at_sky, robot_map};
 
-use robotics_lib::runner::backpack::{BackPack};
+use robotics_lib::runner::backpack::BackPack;
 use robotics_lib::runner::{Robot, Runnable, Runner};
 use robotics_lib::utils::LibError;
 use robotics_lib::world::coordinates::Coordinate;
 use robotics_lib::world::environmental_conditions::{EnvironmentalConditions, WeatherType};
 
+use crate::explorer::new_explorer;
+use crate::utils::{
+    calculate_spatial_index, execute_mission, get_world_dimension, ActiveRegion, Mission,
+};
 use robotics_lib::world::tile::Content::{
     Bank, Bin, Building, Bush, Coin, Crate, Fire, Fish, Garbage, JollyBlock, Market, Rock,
     Scarecrow, Tree, Water,
@@ -21,27 +25,23 @@ use robotics_lib::world::tile::TileType::{
 };
 use robotics_lib::world::tile::{Content, Tile, TileType};
 use robotics_lib::world::World;
-use rust_eze_tomtom::TomTom;
-use vent_tool_ascii_crab::Vent;
-use std::collections::{HashMap, HashSet, VecDeque};
-use crate::explorer::new_explorer;
-use crate::utils::{calculate_spatial_index, execute_mission, get_world_dimension, ActiveRegion, Mission};
 use rust_and_furious_dynamo::dynamo::Dynamo;
+use rust_eze_tomtom::TomTom;
+use std::collections::{HashMap, HashSet, VecDeque};
+use vent_tool_ascii_crab::Vent;
 
 // Frontend
 include!("worldloader.rs");
+use bounce::*;
+use log::info;
+use std::cell::RefCell;
 use std::path::PathBuf;
+use std::rc::Rc;
+use wasm_bindgen::JsValue;
+use wasm_bindgen_futures::JsFuture;
+use web_sys::window;
 use yew::prelude::*;
 use yew::{function_component, html, Html, Properties};
-use bounce::*;
-use std::cell::RefCell;
-use std::rc::Rc;
-use log::info;
-use wasm_bindgen::JsValue;
-use web_sys::{window};
-use wasm_bindgen_futures::JsFuture;
-
-
 
 // enums to allow updates inside the impl
 #[derive(Clone, PartialEq, Atom)]
@@ -131,7 +131,6 @@ pub fn main() -> Html {
     }
 }
 
-
 #[function_component(BackP)]
 pub fn backpack() -> Html {
     let backState = use_atom::<BackpackState>();
@@ -163,7 +162,7 @@ pub struct BackItemProps {
 
 #[function_component(BackItem)]
 fn backItem(props: &BackItemProps) -> Html {
-    let img_display: String = content_match(&props.content);
+    let img_display: String = content_match_day(&props.content);
     html! {
         <div class={classes!("back_item")}>
             <img  src={img_display}/>
@@ -250,23 +249,53 @@ pub struct MapTileProps {
 
 #[function_component(MapTile)]
 pub fn map_tile(props: &MapTileProps) -> Html {
-    let img_display: &str;
-    match props.tile.tile_type {
-        TileType::Wall=>img_display="https://preview.redd.it/vf95xj8n6k251.jpg?auto=webp&s=8354e27ac03c946cf2c8a39bad68456a5e685bd0",
-        DeepWater=>img_display="https://static.planetminecraft.com/files/image/minecraft/texture-pack/2020/887/13327895-pack_l.jpg",
-        ShallowWater => img_display="https://i.pinimg.com/736x/7f/39/c5/7f39c55042808b3064364db03df40ac0.jpg",
-        Sand =>img_display="https://www.fractalcamo.com/uploads/5/9/0/2/5902948/s189772745713394276_p3861_i148_w750.jpeg",
-        Grass => img_display="https://i.pinimg.com/originals/cf/5e/27/cf5e272e452b9c7caa8fa0523eeeba9f.png",
-        Street => img_display="https://lh3.bunny.novaskin.me/nOVtS_Zjk_vKOf48sw_x9Z2Cn8zIHYhs3TXEifYtbyriEWjS1D4i9W4bl5WmSdn9_SJp3Qy9Y41azSu-L8OQ2Q",
-        Hill => img_display="https://i.redd.it/oxk07labr9b71.jpg",
-        Mountain => img_display="https://www.filterforge.com/filters/11635-v8.jpg",
-        Snow => img_display="https://dm0qx8t0i9gc9.cloudfront.net/watermarks/image/rDtN98Qoishumwih/white-snow-minecraft-pattern_SB_PM.jpg",
-        Lava => img_display="https://www.fractalcamo.com/uploads/5/9/0/2/5902948/s189772745713394276_p8111_i149_w1500.jpeg",
-        Teleport(_) => img_display="https://gamepedia.cursecdn.com/minecraft_es_gamepedia/e/e4/NetherPortal.gif?version=ee833d337bb150e012426cb883b337a7", 
-}
+    let cond_state = use_atom::<EnviromentalState>();
+    let hour: u8 = cond_state.time[0..2]
+        .to_owned()
+        .parse::<u8>()
+        .expect("Bought the flight to Cali racks & condoms in my suitcase");
+    let tile_style: &str;
+    let daytime: bool;
+    match hour {
+        19..=23 | 00..=05 => {
+            daytime = false;
+        }
+        _ => {
+            daytime = true;
+        }
+    }
+    match daytime {
+        true => match props.tile.tile_type {
+            TileType::Wall => tile_style = "background-color: rgb(125, 125, 125);",
+            DeepWater => tile_style = "background-color: #2B00FF;",
+            ShallowWater => tile_style = "background-color: #00B3FF;",
+            Sand => tile_style = "background-color: #FFC400;",
+            Grass => tile_style = "background-color: #23B606;",
+            Street => tile_style = "background-color: #000000;",
+            Hill => tile_style = "background-color: #FFBD4A;",
+            Mountain => tile_style = "background-color: #8C8CF9;",
+            Snow => tile_style = "background-color: #F5F5F5;",
+            Lava => tile_style = "background-color: #F2DA3E;",
+            Teleport(_) => tile_style = "background-color: #BC1FEC;",
+        },
+        false => match props.tile.tile_type {
+            TileType::Wall => tile_style = "background-color: rgb(125, 125, 125);",
+            DeepWater => tile_style = "background-color: #030C58;",
+            ShallowWater => tile_style = "background-color: #074A84;",
+            Sand => tile_style = "background-color: #A5931B;",
+            Grass => tile_style = "background-color: #0E5411;",
+            Street => tile_style = "background-color: #000000;",
+            Hill => tile_style = "background-color: #573708;",
+            Mountain => tile_style = "background-color: #20314A;",
+            Snow => tile_style = "background-color: #C9C9C9;",
+            Lava => tile_style = "background-color: #F2DA3E;",
+            Teleport(_) => tile_style = "background-color: #56038D;",
+        },
+    }
+
     html! {
         <div class={classes!("tile")}>
-            <img class={classes!("tile_type")} src={img_display}/>
+            <div class={classes!("tile_type")} style={tile_style}/>
             <MapTileContent tile={props.tile.clone()}/>
         </div>
 
@@ -275,7 +304,21 @@ pub fn map_tile(props: &MapTileProps) -> Html {
 
 #[function_component(MapTileContent)]
 pub fn map_tile_content(props: &MapTileProps) -> Html {
-    let img_display: String = content_match(&props.tile.content);
+    let cond_state = use_atom::<EnviromentalState>();
+    let img_display: String;
+    let hour: u8 = cond_state.time[0..2]
+        .to_owned()
+        .parse::<u8>()
+        .expect("Bought the flight to Cali racks & condoms in my suitcase");
+    match hour {
+        19..=23 | 00..=05 => {
+            img_display = content_match_day(&props.tile.content);
+        }
+        _ => {
+            img_display = content_match_night(&props.tile.content);
+        }
+    }
+
     if img_display == "" {
         html! {<></>}
     } else {
@@ -283,10 +326,9 @@ pub fn map_tile_content(props: &MapTileProps) -> Html {
             <img  class={classes!("tile_content")} src={img_display}/>
         }
     }
-    
 }
 
-fn content_match(input: &Content) -> String {
+fn content_match_day(input: &Content) -> String {
     match input {
         Rock(_) =>return  "https://media.forgecdn.net/avatars/84/877/636198378292789888.png".to_string(),
         Tree(_) =>return  "https://minecraft.wiki/images/thumb/Azalea_Tree.png/250px-Azalea_Tree.png?945ad".to_string(),
@@ -307,12 +349,29 @@ fn content_match(input: &Content) -> String {
 }
 }
 
-
-
-
+fn content_match_night(input: &Content) -> String {
+    match input {
+        Rock(_) =>return  "https://media.forgecdn.net/avatars/84/877/636198378292789888.png".to_string(),
+        Tree(_) =>return  "https://minecraft.wiki/images/thumb/Azalea_Tree.png/250px-Azalea_Tree.png?945ad".to_string(),
+        Garbage(_) => return "https://freepngimg.com/thumb/minecraft/70728-block-shelter-mine-terraria-minecraft:-pocket-edition.png".to_string(),
+        Fire => return "https://gamepedia.cursecdn.com/minecraft_gamepedia/archive/3/30/20200127071142!Fire.png?version=2b5a474706c157ed26f2758972649977".to_string(),
+        Coin(_) => return "https://webstockreview.net/images/coin-clipart-fandom-7.png".to_string(),
+        Bin(_) => return "https://cdn.modrinth.com/data/Y9vogxIg/icon.png".to_string(),
+        Crate(_) => return "https://gamepedia.cursecdn.com/minecraft_gamepedia/b/b3/Chest.png?version=227b3f51ef706a4ce4cf5e91f0e4face".to_string(),
+        Bank(_) =>return  "https://vignette.wikia.nocookie.net/pixelpeople/images/a/ae/Bank.png/revision/latest?cb=20130904201633".to_string(),
+        Water(_) => return "https://lh3.googleusercontent.com/MA3xe8ff0oksJ6Z_vBrg2scDLlX_uAXQxSnHfi5Ivc2MBPMWluYYrPGXHcSFWEtTQ8dTX-SQm4GAf-CJZKFkhA=s400".to_string(),
+        Market(_) => return "https://gamepedia.cursecdn.com/minecraft_de_gamepedia/3/3c/Dorf.png".to_string(),
+        Fish(_) =>return  "https://gamepedia.cursecdn.com/minecraft_gamepedia/a/ad/Tropical_Fish_JE2_BE2.png".to_string(),
+        Building => return "https://gamepedia.cursecdn.com/minecraft_gamepedia/f/f5/Plains_Cartographer_1.png".to_string(),
+        Bush(_) => return "https://gamepedia.cursecdn.com/minecraft_gamepedia/5/54/Berry_Bush_%28The_Aether%29.png?version=bb068bff721dfc749d68f5b87345dd56".to_string(),
+        JollyBlock(_) => return "https://www.tynker.com/minecraft/editor/block/diamond_block/5cc07b98cebfbd1c2154195a/?image=true".to_string(),
+        Scarecrow => return "https://lh3.googleusercontent.com/Wa9r8of1_KTeOtj5wEfDgRxUM2cq3MqrCVdUYkQy8D2hCtNZnuAFdJ1fF8D6lgpQRkRgLkkN8H1Yjnsr-oDclQ=s400".to_string(),
+        Content::None => return "".to_string(),        
+}
+}
 
 // TIMO CODE
-pub(crate) struct Jerry{
+pub(crate) struct Jerry {
     pub(crate) robot: Robot,
     pub(crate) bps: UseAtomHandle<BackpackState>,
     pub(crate) ws: UseAtomHandle<WorldState>,
@@ -346,33 +405,32 @@ pub fn timo_ai() -> Html {
     {
         impl Runnable for Jerry {
             fn process_tick(&mut self, world: &mut World) {
-                if self.tick_counter == 0{
+                if self.tick_counter == 0 {
                     first_tick(self, world);
                 }
-                    execute_mission( self, world);
-                    println!("{:?} {}", self.robot.energy, self.tick_counter);
-                    self.tick_counter += 1;
-                    
-                    // Update UI State
-                    let tmpMap = robot_map(&world).unwrap_or_default();
-                    let tmp_conditions = look_at_sky(&world);
-                    info!("{:?} Internal Map",tmpMap);
-                    if tmpMap != self.ws.world {
-                        self.ws.set(WorldState {
-                            world: tmpMap,
-                            counter: self.ws.counter.clone() +1
-                        });
-                        // info!("CHANGED WORLD");
-                    }
-                    let tmp_time = tmp_conditions.get_time_of_day_string();
-                    if self.env.time != tmp_time{
-                    self.env.set(EnviromentalState { 
+                execute_mission(self, world);
+                println!("{:?} {}", self.robot.energy, self.tick_counter);
+                self.tick_counter += 1;
+
+                // Update UI State
+                let tmpMap = robot_map(&world).unwrap_or_default();
+                let tmp_conditions = look_at_sky(&world);
+                info!("{:?} Internal Map", tmpMap);
+                if tmpMap != self.ws.world {
+                    self.ws.set(WorldState {
+                        world: tmpMap,
+                        counter: self.ws.counter.clone() + 1,
+                    });
+                    // info!("CHANGED WORLD");
+                }
+                let tmp_time = tmp_conditions.get_time_of_day_string();
+                if self.env.time != tmp_time {
+                    self.env.set(EnviromentalState {
                         forecast: tmp_conditions.get_weather_condition(),
                         time: tmp_time,
-                     });
-                    }
-                    // info!("CHANGED CONDITIONS");
-
+                    });
+                }
+                // info!("CHANGED CONDITIONS");
             }
 
             fn handle_event(&mut self, event: Event) {
@@ -397,20 +455,31 @@ pub fn timo_ai() -> Html {
                             });
                             info!("[ State Update ] New Backpack State");
                         }
-                        
                     }
                     Event::Moved(_, position) => {
                         if position.0 >= self.active_region.bottom_right.0 {
-                            self.active_region.bottom_right.0 = if position.0 == self.world_dim - 1 { self.world_dim - 1 } else { position.0 + 1 };
+                            self.active_region.bottom_right.0 = if position.0 == self.world_dim - 1
+                            {
+                                self.world_dim - 1
+                            } else {
+                                position.0 + 1
+                            };
                         }
                         if position.1 >= self.active_region.bottom_right.1 {
-                            self.active_region.bottom_right.1 = if position.1 == self.world_dim - 1 { self.world_dim - 1 } else { position.1 + 1 };
+                            self.active_region.bottom_right.1 = if position.1 == self.world_dim - 1
+                            {
+                                self.world_dim - 1
+                            } else {
+                                position.1 + 1
+                            };
                         }
                         if position.0 <= self.active_region.top_left.0 {
-                            self.active_region.top_left.0 = if position.0 == 0 { 0 } else { position.0 - 1 };
+                            self.active_region.top_left.0 =
+                                if position.0 == 0 { 0 } else { position.0 - 1 };
                         }
                         if position.1 <= self.active_region.top_left.1 {
-                            self.active_region.top_left.1 = if position.1 == 0 { 0 } else { position.1 - 1 };
+                            self.active_region.top_left.1 =
+                                if position.1 == 0 { 0 } else { position.1 - 1 };
                         }
                         let tmp_coords = self.get_coordinate();
                         // info!("[ State Update ] NEW COORDS: {:?}", tmp_coords);
@@ -418,7 +487,7 @@ pub fn timo_ai() -> Html {
                             coord: (tmp_coords.get_row(), tmp_coords.get_col()),
                             // energy: self.rs.energy.clone()
                         });
-                    },
+                    }
                     // Event::Ready => todo!(),
                     // Event::Terminated => todo!(),
                     // Event::TimeChanged(newEnviromentalConds) => {
@@ -426,18 +495,16 @@ pub fn timo_ai() -> Html {
                     //     worldStatus.set(WorldState { world: worldStatus.world.clone(), enviromentalConditions: newEnviromentalConds })
                     // },
                     // Event::DayChanged(newEnviromentalConds) => {
-                        
+
                     // },
                     Event::EnergyRecharged(_) | Event::EnergyConsumed(_) => {
                         // let robotStatus = self.rs.clone();
                         // robotStatus.set(RobotState {coord: robotStatus.coord, energy: self.get_energy().get_energy_level()});
                         let tmp_energy = self.get_energy().get_energy_level();
                         if self.en.energy != tmp_energy {
-                            self.en.set(EnergyState {
-                                energy: tmp_energy,
-                            })
+                            self.en.set(EnergyState { energy: tmp_energy })
                         }
-                    },
+                    }
                     _ => (),
                 };
 
@@ -465,15 +532,19 @@ pub fn timo_ai() -> Html {
                 &mut self.robot.backpack
             }
         }
-        fn first_tick(jerry: &mut Jerry, world: &mut World){
+        fn first_tick(jerry: &mut Jerry, world: &mut World) {
             let size = get_world_dimension(world);
             jerry.world_dim = size;
-            jerry.active_region.spatial_index = calculate_spatial_index(jerry.get_coordinate().get_row(), jerry.get_coordinate().get_col(), size);
+            jerry.active_region.spatial_index = calculate_spatial_index(
+                jerry.get_coordinate().get_row(),
+                jerry.get_coordinate().get_col(),
+                size,
+            );
             let explorer = new_explorer(jerry, world, jerry.active_region.spatial_index);
             jerry.missions.push_back(explorer);
         }
         // RUNNING THE GAME
-        let r = Jerry{
+        let r = Jerry {
             robot: Robot::new(),
             bps: backState.clone(),
             ws: world_state.clone(),
@@ -482,70 +553,67 @@ pub fn timo_ai() -> Html {
             en: energy_state.clone(),
             tick_counter: 0,
             world_dim: 0,
-            active_region: ActiveRegion{
-                top_left: (279,279), 
-                bottom_right: (0,0), 
-                spatial_index: 0
+            active_region: ActiveRegion {
+                top_left: (279, 279),
+                bottom_right: (0, 0),
+                spatial_index: 0,
             },
             vent: Rc::new(RefCell::new(Vent::new())),
             road_tiles: HashSet::new(),
-            dynamo: Dynamo{},
+            dynamo: Dynamo {},
             weather_predictor: WeatherPredictionTool::new(),
-            tom_tom: TomTom{},
+            tom_tom: TomTom {},
             charting_tools: ChartingTools,
             missions: VecDeque::new(),
-            };
+        };
 
-            let mut generator = WorldgeneratorUnwrap::init(false, Some(PathBuf::from("world.bin")));
-            let run = Rc::new(RefCell::new(Runner::new(Box::new(r), &mut generator)));
-            
-            if world_state.counter == 0 {
-                info!("STARTING GAME...");
-                wasm_bindgen_futures::spawn_local(async move {
-                    let _done = run_game(run).await;
-                });
-            }
+        let mut generator = WorldgeneratorUnwrap::init(false, Some(PathBuf::from("world.bin")));
+        let run = Rc::new(RefCell::new(Runner::new(Box::new(r), &mut generator)));
+
+        if world_state.counter == 0 {
+            info!("STARTING GAME...");
+            wasm_bindgen_futures::spawn_local(async move {
+                let _done = run_game(run).await;
+            });
+        }
     }
     html! {
         <></>
     }
 }
 
-
-
-
-    async fn run_game(run: Rc<RefCell<Result<Runner, LibError>>>) -> () {
-        sleep(3000).await;
-        for _  in 0..10000 {
-            sleep(1).await;
-            info!("[ RUNNER ] Tick");
-            // Get a mutable reference to the Result<Runner>
-            let mut runner_result = run.borrow_mut();
-            // Handle the Result using map and map_err
-            runner_result.as_mut().map(|runner| {
+async fn run_game(run: Rc<RefCell<Result<Runner, LibError>>>) -> () {
+    sleep(3000).await;
+    for _ in 0..10000 {
+        sleep(1).await;
+        info!("[ RUNNER ] Tick");
+        // Get a mutable reference to the Result<Runner>
+        let mut runner_result = run.borrow_mut();
+        // Handle the Result using map and map_err
+        runner_result
+            .as_mut()
+            .map(|runner| {
                 // runner is now a mutable reference to the Runner
                 let _ = runner.game_tick();
                 let _robot_coordinate = runner.get_robot().get_coordinate();
-            }).map_err(|e| {
+            })
+            .map_err(|e| {
                 info!("[ RUNNER ] ERROR WITH RUN: {:?}", e);
-            }).unwrap_or_else(|_| {
+            })
+            .unwrap_or_else(|_| {
                 info!("[ RUNNER ] ERROR WITH RUN. ");
             });
-        }
     }
+}
 
+// Custom sleep function to support the web
+async fn sleep(duration: u32) {
+    let promise = js_sys::Promise::new(&mut |resolve, _| {
+        window()
+            .unwrap()
+            .set_timeout_with_callback_and_timeout_and_arguments_0(&resolve, duration as i32)
+            .unwrap();
+    });
 
-    // Custom sleep function to support the web
-    async fn sleep(duration: u32) {
-        let promise = js_sys::Promise::new(&mut |resolve, _| {
-            window()
-                .unwrap()
-                .set_timeout_with_callback_and_timeout_and_arguments_0(
-                    &resolve,
-                    duration as i32,
-                )
-                .unwrap();
-        });
-    
-        let _ = JsFuture::from(promise).await;
-    }
+    let _ = JsFuture::from(promise).await;
+}
