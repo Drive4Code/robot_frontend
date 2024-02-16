@@ -131,7 +131,7 @@ pub fn main() -> Html {
     html! {
         html! {
             <div id="info">
-                // <BackP/>
+                <BackP/>
                 <EnergyBar/>
                 <EnviromentBar />
                 <br/>
@@ -522,6 +522,42 @@ pub fn timo_ai() -> Html {
     }
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// NICO CODE
 #[function_component(NicoAi)]
 pub fn nico_ai() -> Html {
     let backState = use_atom::<BackpackState>();
@@ -541,14 +577,6 @@ pub fn nico_ai() -> Html {
         pub(crate) env: UseAtomHandle<EnviromentalState>,
         pub(crate) en: UseAtomHandle<EnergyState>
     }
-
-//     //for i in 0..1000 {
-//     runner.game_tick();
-// //             Ok(..) => {},
-// //             Err(e) => println!("{:?}", e.to_string())
-// //         }
-// //     }
-
 
     impl Runnable for MyRobot {
         fn process_tick(&mut self, world: &mut World) {
@@ -580,7 +608,7 @@ pub fn nico_ai() -> Html {
             println!("event: {:?}", event.to_string());
             let msg = JsValue::from(format!("{:?}", event));
             // info!("[ EVENT ]{}", msg.as_string().unwrap());
-            // Backpack Updates
+            // Event Updates
             match event {
                 Event::AddedToBackpack(_, _) | Event::RemovedFromBackpack(_, _) => {
                     let newBack = self.get_backpack();
@@ -1137,7 +1165,6 @@ pub fn nico_ai() -> Html {
             runner_result.as_mut().map(|runner| {
                 // runner is now a mutable reference to the Runner
                 let _ = runner.game_tick();
-                let _robot_coordinate = runner.get_robot().get_coordinate();
             }).map_err(|e| {
                 info!("[ RUNNER ] ERROR WITH RUN: {:?}", e);
             }).unwrap_or_else(|_| {
