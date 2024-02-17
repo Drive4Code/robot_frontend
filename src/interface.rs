@@ -42,7 +42,6 @@ use wasm_bindgen_futures::JsFuture;
 use web_sys::{window, HtmlInputElement};
 use yew::prelude::*;
 use yew::{function_component, html, Html, Properties};
-use stylist::css;
 
 // enums to allow updates inside the impl
 #[derive(Clone, PartialEq, Atom)]
