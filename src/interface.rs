@@ -361,13 +361,13 @@ pub fn timo_ai() -> Html {
                     first_tick(self, world);
                 }
                     execute_mission( self, world);
-                    println!("{:?} {}", self.robot.energy, self.tick_counter);
+                    info!("{:?} {}", self.robot.energy, self.tick_counter);
                     self.tick_counter += 1;
                     
                     // Update UI State
                     let tmpMap = robot_map(&world).unwrap_or_default();
                     let tmp_conditions = look_at_sky(&world);
-                    info!("{:?} Internal Map",tmpMap);
+                    // info!("{:?} Internal Map",tmpMap);
                     if tmpMap != self.ws.world {
                         self.ws.set(WorldState {
                             world: tmpMap,
@@ -387,8 +387,8 @@ pub fn timo_ai() -> Html {
             }
 
             fn handle_event(&mut self, event: Event) {
-                println!();
-                println!("{:?}", event);
+                info!("");
+                info!("{:?}", event);
                 // Logs the event to the console
                 let msg = JsValue::from(format!("{:?}", event));
                 // info!("[ EVENT ]{}", msg.as_string().unwrap());
@@ -452,7 +452,7 @@ pub fn timo_ai() -> Html {
                     _ => (),
                 };
 
-                println!();
+                info!("");
             }
 
             fn get_energy(&self) -> &Energy {
@@ -581,7 +581,7 @@ pub fn nico_ai() -> Html {
     impl Runnable for MyRobot {
         fn process_tick(&mut self, world: &mut World) {
             let mut w = WeatherPredictionTool::new();
-            println!("Weather prediction for next tick! The desert will experience a {:?} day! We should get everything done before that!",
+            info!("Weather prediction for next tick! The desert will experience a {:?} day! We should get everything done before that!",
                      WeatherPredictionTool::predict(&mut w, 1).unwrap_or(Sunny));
             call(self, world, "rock", 0);
             let tmpMap = robot_map(&world).unwrap_or_default();
@@ -592,7 +592,7 @@ pub fn nico_ai() -> Html {
                     world: tmpMap,
                     counter: self.ws.counter.clone() + 1
                 });
-                // info!("CHANGED WORLD");
+                info!("CHANGED WORLD");
             }
             let tmp_time = tmp_conditions.get_time_of_day_string();
             if self.env.time != tmp_time {
@@ -601,11 +601,11 @@ pub fn nico_ai() -> Html {
                     time: tmp_time,
                 });
             }
-            // info!("CHANGED CONDITIONS");
+            info!("CHANGED CONDITIONS");
         }
 
         fn handle_event(&mut self, event: Event) {
-            println!("event: {:?}", event.to_string());
+            info!("event: {:?}", event.to_string());
             let msg = JsValue::from(format!("{:?}", event));
             // info!("[ EVENT ]{}", msg.as_string().unwrap());
             // Event Updates
@@ -656,7 +656,7 @@ pub fn nico_ai() -> Html {
                 _ => (),
             };
 
-            println!();
+            info!("");
         }
 
         fn get_energy(&self) -> &Energy {
@@ -708,7 +708,7 @@ pub fn nico_ai() -> Html {
             match TomTom::go_to_tile(robot, world, false, None, Some(PlainContent::Rock)) {
                 Ok(path) => {
                     recharge(robot);
-                    println!("A rock was found!");
+                    info!("A rock was found!");
                     TomTom::go_to_tile(robot, world, false, None, Some(PlainContent::Rock));
                     go(robot, world, Direction::Down);
                     match bessie::bessie::road_paving_machine(
@@ -716,11 +716,11 @@ pub fn nico_ai() -> Html {
                         world,
                         Direction::Up,
                         bessie::bessie::State::GetStones) {
-                        Ok(b) => println!("{:?}", b),
+                        Ok(b) => info!("{:?}", b),
                         Err(e) => {
                             match e {
                                 RpmError::UndefinedError => call(robot, world, "street", 1),
-                                _ => println!("{:?}", e)
+                                _ => info!("{:?}", e)
                             }
                         }
                     }
@@ -736,7 +736,7 @@ pub fn nico_ai() -> Html {
 
    
     fn street_paving_mode(robot: &mut impl Runnable, world: &mut World, cycle: i32) {
-        println!("Let's build some roads");
+        info!("Let's build some roads");
         recharge(robot);
         while !robot.get_backpack().get_contents().is_empty() {
             match cycle {
@@ -770,7 +770,7 @@ pub fn nico_ai() -> Html {
                                         //street_paving_mode(robot, world, cycle);
                                         return;
                                     },
-                                    Ok(p) => println!("{:?}", p),
+                                    Ok(p) => info!("{:?}", p),
                                     _ => {
                                         //street_paving_mode(robot, world, -1);
                                         return;
@@ -787,7 +787,7 @@ pub fn nico_ai() -> Html {
                                             // } else {
                                             //     street_paving_mode(robot, world, cycle * -1);
                                             // }
-                                            println!("{:?}",
+                                            info!("{:?}",
                                                      bessie::bessie::road_paving_machine(
                                                          robot,
                                                          world,
@@ -831,7 +831,7 @@ pub fn nico_ai() -> Html {
                                     //street_paving_mode(robot, world, cycle);
                                     return;
                                 },
-                                Ok(p) => println!("{:?}", p),
+                                Ok(p) => info!("{:?}", p),
                                 _ => {
                                     //street_paving_mode(robot, world, -1);
                                     return;
@@ -848,7 +848,7 @@ pub fn nico_ai() -> Html {
                                         // } else {
                                         //     street_paving_mode(robot, world, cycle * -1);
                                         // }
-                                        println!("{:?}",
+                                        info!("{:?}",
                                                  bessie::bessie::road_paving_machine(
                                                      robot,
                                                      world,
@@ -896,7 +896,7 @@ pub fn nico_ai() -> Html {
                                         //street_paving_mode(robot, world, cycle);
                                         return;
                                     },
-                                    Ok(p) => println!("{:?}", p),
+                                    Ok(p) => info!("{:?}", p),
                                     _ => {
                                         //street_paving_mode(robot, world, -1);
                                         return;
@@ -913,7 +913,7 @@ pub fn nico_ai() -> Html {
                                             // } else {
                                             //     street_paving_mode(robot, world, cycle * -1);
                                             // }
-                                            println!("{:?}",
+                                            info!("{:?}",
                                                      bessie::bessie::road_paving_machine(
                                                          robot,
                                                          world,
@@ -957,7 +957,7 @@ pub fn nico_ai() -> Html {
                                     //street_paving_mode(robot, world, cycle);
                                     return;
                                 },
-                                Ok(p) => println!("{:?}", p),
+                                Ok(p) => info!("{:?}", p),
                                 _ => {
                                     //street_paving_mode(robot, world, -1);
                                     return;
@@ -974,7 +974,7 @@ pub fn nico_ai() -> Html {
                                         // } else {
                                         //     street_paving_mode(robot, world, cycle * -1);
                                         // }
-                                        println!("{:?}",
+                                        info!("{:?}",
                                                  bessie::bessie::road_paving_machine(
                                                      robot,
                                                      world,
@@ -1000,19 +1000,19 @@ pub fn nico_ai() -> Html {
 
    
     fn garbage(robot: &mut impl Runnable, world: &mut World) {
-        println!("Oh no, That's garbage! Let's clean this place!");
+        info!("Oh no, That's garbage! Let's clean this place!");
         while robot.get_energy().has_enough_energy(10) {
             recharge(robot);
             match TomTom::go_to_tile(robot, world, false, None, Some(PlainContent::Garbage)) {
                 Ok(path) => {
-                    println!("Garbage was found!");
+                    info!("Garbage was found!");
                     TomTom::go_to_tile(robot, world, false, None, Some(PlainContent::Garbage));
                     go(robot, world, Direction::Down);
                     destroy(robot, world, Direction::Up);
                     for (key, value) in robot.get_backpack().get_contents().clone() {
                         if key == Content::Garbage(0) {
                             if value == 10 {
-                                println!("We found 10 pieces, let's go throw them out");
+                                info!("We found 10 pieces, let's go throw them out");
                                 collect_garbage(robot, world);
                                 return;
                             }
@@ -1034,16 +1034,16 @@ pub fn nico_ai() -> Html {
                              GoalType::ThrowGarbage, Some(Content::Garbage(0)), 10);
         let mut tracker = GoalTracker::new();
         tracker.add_goal(task);
-        println!("{:?}", tracker.get_goals().clone());
+        info!("{:?}", tracker.get_goals().clone());
         match TomTom::go_to_tile(robot, world, false, None, Some(PlainContent::Bin)) {
             Ok(path) => {
-                println!("There's a bin!");
+                info!("There's a bin!");
                 TomTom::go_to_tile(robot, world, false, None, Some(PlainContent::Bin));
                 go(robot, world, Direction::Down);
                 match throw_garbage(robot, world, Content::Garbage(0), 10, Direction::Up, &mut tracker) {
                     Ok(..) => {
                         if tracker.get_completed_number() == 1 {
-                            println!("{:?}", tracker.get_goals());
+                            info!("{:?}", tracker.get_goals());
                             call(robot, world, "rock", 0);
                             //exit(0)
                         } else {
@@ -1069,7 +1069,7 @@ pub fn nico_ai() -> Html {
             "rock" => rock(robot, world),
             "street" => street_paving_mode(robot, world, streetcycle),
             "garbage" => garbage(robot, world),
-            _ => println!("invalid function call"),
+            _ => info!("invalid function call"),
         }
     }
     fn recharge(robot: &mut impl Runnable) {
@@ -1137,7 +1137,7 @@ pub fn nico_ai() -> Html {
         match d {
             Direction::Up => {
                 if robot.get_coordinate().get_row() == 0 {
-                    println!("Watch out!");
+                    info!("Watch out!");
                     go(robot, world, Direction::Down);
                     go(robot, world, Direction::Down);
                     recharge(robot);
@@ -1145,7 +1145,7 @@ pub fn nico_ai() -> Html {
             },
             Direction::Down => {
                 if robot.get_coordinate().get_row() == 279 {
-                    println!("Watch out!");
+                    info!("Watch out!");
                     go(robot, world, Direction::Up);
                     go(robot, world, Direction::Up);
                     recharge(robot);
@@ -1153,7 +1153,7 @@ pub fn nico_ai() -> Html {
             },
             Direction::Right => {
                 if robot.get_coordinate().get_col() == 279 {
-                    println!("Watch out!");
+                    info!("Watch out!");
                     go(robot, world, Direction::Left);
                     go(robot, world, Direction::Left);
                     recharge(robot);
@@ -1161,7 +1161,7 @@ pub fn nico_ai() -> Html {
             },
             Direction::Left => {
                 if robot.get_coordinate().get_col() == 0 {
-                    println!("Watch out!");
+                    info!("Watch out!");
                     go(robot, world, Direction::Right);
                     go(robot, world, Direction::Right);
                     recharge(robot);
@@ -1180,7 +1180,7 @@ pub fn nico_ai() -> Html {
     async fn run_game(run: Rc<RefCell<Result<Runner, LibError>>>) -> () {
         sleep(3000).await;
         for _  in 0..10000 {
-            sleep(1).await;
+            sleep(1000).await;
             info!("[ RUNNER ] Tick");
             // Get a mutable reference to the Result<Runner>
             let mut runner_result = run.borrow_mut();
