@@ -1,5 +1,5 @@
 :root {
-  --tile-size: 4px;
+  --tile-size: 2px;
   --background-color: #f0f0f0;
 }
 
@@ -78,6 +78,11 @@ body {
   display: block;
   width: 100%;
   height: auto;
+}
+
+.tile_type {
+  width: var(--tile-size);
+  height: var(--tile-size);
 }
 
 #robot {
