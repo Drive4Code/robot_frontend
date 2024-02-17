@@ -39,13 +39,14 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use wasm_bindgen::JsValue;
 use wasm_bindgen_futures::JsFuture;
-use web_sys::window;
+use web_sys::{window, HtmlInputElement};
 use yew::prelude::*;
 use yew::{function_component, html, Html, Properties};
+use stylist::css;
 
 // enums to allow updates inside the impl
 #[derive(Clone, PartialEq, Atom)]
-struct BackpackState {
+pub(crate) struct BackpackState {
     size: usize,
     content: HashMap<Content, usize>,
 }
@@ -60,7 +61,7 @@ impl Default for BackpackState {
 }
 
 #[derive(Clone, PartialEq, Atom)]
-struct WorldState {
+pub(crate) struct WorldState {
     world: Vec<Vec<Option<Tile>>>,
     counter: usize,
 }
@@ -75,7 +76,7 @@ impl Default for WorldState {
 }
 
 #[derive(Clone, PartialEq, Atom)]
-struct EnviromentalState {
+pub(crate) struct EnviromentalState {
     forecast: WeatherType,
     time: String,
 }
@@ -90,7 +91,7 @@ impl Default for EnviromentalState {
 }
 
 #[derive(Clone, PartialEq, Atom)]
-struct RobotState {
+pub(crate) struct RobotState {
     coord: (usize, usize),
     // energy: usize,
 }
@@ -102,7 +103,7 @@ impl Default for RobotState {
 }
 
 #[derive(Clone, PartialEq, Atom)]
-struct EnergyState {
+pub(crate) struct EnergyState {
     energy: usize,
     // energy: usize,
 }
@@ -113,19 +114,102 @@ impl Default for EnergyState {
     }
 }
 
+#[derive(Clone, PartialEq, Atom)]
+pub(crate) struct ExtrasState {
+    pub(crate) is_dynamoing: bool,
+    pub(crate) tile_size: usize,
+}
+
+impl Default for ExtrasState {
+    fn default() -> Self {
+        Self {
+            is_dynamoing: false,
+            tile_size: 1,
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Atom)]
+pub(crate) struct StartingSettings {
+    start_ai: bool,
+    tile_size: usize,
+    tick_time: usize,
+}
+
+impl Default for StartingSettings {
+    fn default() -> Self {
+        Self {
+            start_ai: false,
+            tile_size: 5,
+            tick_time: 100,
+        }
+    }
+}
+
 #[function_component(Main)]
 pub fn main() -> Html {
+    let settings = use_atom::<StartingSettings>();
     let msg = JsValue::from(format!("Rendered Main"));
     info!("{}", msg.as_string().unwrap());
+
     html! {
         html! {
-            <div id="info">
-                // <BackP/>
-                <EnergyBar/>
-                <EnviromentBar />
-                <br/>
-                <MapView/>
-            </div>
+
+            { if &settings.start_ai == &true {
+                // Normal robot display
+                html! {
+                    <div id="info">
+                        // <BackP/>
+                        <EnergyBar/>
+                        <EnviromentBar />
+                        // <Zoom />
+                        <br/>
+                        <MapView/>
+                        <TimoAi />
+                    </div>
+                }
+            } else {
+                // Game menu
+                // let on_tick_input = {
+                //     let settings = settings.clone();
+
+                //     Callback::from(move |e: InputEvent| {
+                //         let input: HtmlInputElement = e.target_unchecked_into();
+
+                //         settings.set(StartingSettings { tick_time: input.value().parse::<usize>().expect("Expected usize as tick time"), start_ai: settings.start_ai.clone(), tile_size: settings.tile_size.clone() });
+                //     })
+                // };
+
+                // let on_size_input = {
+                //     let settings = settings.clone();
+
+                //     Callback::from(move |e: InputEvent| {
+                //         let input: HtmlInputElement = e.target_unchecked_into();
+
+                //         settings.set(StartingSettings { tick_time: settings.tick_time.clone(), start_ai: settings.start_ai.clone(), tile_size: input.value().parse::<usize>().expect("Expected usize as tick time") });
+                //     })
+                // };
+
+                // Start the game on button click
+                let start_game = {
+                    let settings = settings.clone();
+
+                    Callback::from(move |_| {
+                        settings.set(StartingSettings { tick_time: settings.tick_time.clone(), start_ai: true, tile_size: settings.tile_size.clone() });
+                    })
+                };
+
+
+                html! {
+                    <div id="info">
+                        <button onclick={start_game} id={"start_button"}>{"Start Game"}</button>
+                    </div>
+                }
+            }
+
+            }
+
+
 
         }
     }
@@ -133,15 +217,15 @@ pub fn main() -> Html {
 
 #[function_component(BackP)]
 pub fn backpack() -> Html {
-    let backState = use_atom::<BackpackState>();
+    let back_state = use_atom::<BackpackState>();
     html! {
         <div id={"backpack"}>
             <h2>{"Backpack"}</h2>
             <hr/>
-            {"Size: "}{ &backState.size}
+            {"Size: "}{ &back_state.size}
             <br/>
-            {"Contents: "} //{ format!("{:?}", &backState.content)}
-            { for backState.content.iter().map(|content| {
+            {"Contents: "} //{ format!("{:?}", &back_state.content)}
+            { for back_state.content.iter().map(|content| {
                 match content.1 {
                     0 => html! {<></>},
                     _ => html! {
@@ -161,7 +245,7 @@ pub struct BackItemProps {
 }
 
 #[function_component(BackItem)]
-fn backItem(props: &BackItemProps) -> Html {
+fn back_item(props: &BackItemProps) -> Html {
     let img_display: String = content_match_day(&props.content);
     html! {
         <div class={classes!("back_item")}>
@@ -207,10 +291,38 @@ fn match_forecast(conditions: &WeatherType) -> String {
     }
 }
 
+// RING RING
+#[function_component(Zoom)]
+fn zoom() -> Html {
+    let extra_state = use_atom::<ExtrasState>();
+
+    let onchange_slider = {
+        Callback::from(move |e: yew::prelude::Event| {
+            let input: HtmlInputElement = e.target_unchecked_into();
+            let value = input.value().parse::<usize>().unwrap_or(4);
+            log::info!("value = {}", &value);
+            extra_state.set(ExtrasState {
+                is_dynamoing: extra_state.is_dynamoing.clone(),
+                tile_size: value,
+            });
+        })
+    };
+
+    html! {
+        <div class="slider">
+             <input type="range" class="form-range" min="1" max="10" id="my_broken_slider" onchange={onchange_slider.clone()} />
+            //   <label for="my_broken_slider" class="form-label">{&*value_label}</label>
+        </div>
+    }
+}
+
 #[function_component(MapView)]
 pub fn map_view() -> Html {
     let world_state = use_atom::<WorldState>();
-    let robotState = use_atom::<RobotState>();
+    let robot_state = use_atom::<RobotState>();
+    let settings = use_atom::<StartingSettings>();
+    // let extra_state = use_atom::<ExtrasState>();
+    let world_styles = format!("width: {}px; height: {}px; background-color: var(--background-color);", settings.tile_size.clone().to_string(), settings.tile_size.clone().to_string());
 
     html! {
         <div id={"robot_view"}>
@@ -222,8 +334,8 @@ pub fn map_view() -> Html {
                                 Some(tile) => html! {
                                     <div class={"tile"}>
                                     <MapTile tile={tile.clone()}/>
-                                    {if i == robotState.coord.0.clone() && j == robotState.coord.1.clone() {
-                                       html! {<img id={"robot"} src={"https://icons.iconarchive.com/icons/google/noto-emoji-smileys/1024/10103-robot-face-icon.png"} />}
+                                    {if i == robot_state.coord.0.clone() && j == robot_state.coord.1.clone() {
+                                                    html! {<img id={"robot"} src={"https://icons.iconarchive.com/icons/google/noto-emoji-smileys/1024/10103-robot-face-icon.png"} />}
                                     } else {
                                         html! {}
                                     }}
@@ -231,7 +343,7 @@ pub fn map_view() -> Html {
                                     },
                                 None => html! {
                                     // <></>
-                                    <div class={classes!("tile")} style={"width: var(--tile-size); height: var(--tile-size); background-color: var(--background-color);"}></div>
+                                    <div class={classes!("tile")} style={world_styles.clone()}></div>
                                 },
                             }
                         })}
@@ -309,63 +421,44 @@ pub fn map_tile_content(props: &MapTileProps) -> Html {
     let hour: u8 = cond_state.time[0..2]
         .to_owned()
         .parse::<u8>()
-        .expect("Bought the flight to Cali racks & condoms in my suitcase");
-    match hour {
-        19..=23 | 00..=05 => {
-            img_display = content_match_day(&props.tile.content);
-        }
-        _ => {
-            img_display = content_match_night(&props.tile.content);
-        }
-    }
+        .expect("Expected a number for time");
+    img_display = content_match_day(&props.tile.content);
 
     if img_display == "" {
         html! {<></>}
     } else {
-        html! {
-            <img  class={classes!("tile_content")} src={img_display}/>
+        match hour {
+            19..=23 | 00..=05 => {
+                html! {
+                    <img style={"filter: brightness(50%);"} class={classes!("tile_content")} src={img_display}/>
+                }
+            }
+            _ => {
+                html! {
+                    <img  class={classes!("tile_content")} src={img_display}/>
+                }
+            }
         }
     }
 }
 
 fn content_match_day(input: &Content) -> String {
     match input {
-        Rock(_) =>return  "https://media.forgecdn.net/avatars/84/877/636198378292789888.png".to_string(),
+        Rock(_) =>return  "img/rock-min.png".to_string(),
         Tree(_) =>return  "https://minecraft.wiki/images/thumb/Azalea_Tree.png/250px-Azalea_Tree.png?945ad".to_string(),
-        Garbage(_) => return "https://freepngimg.com/thumb/minecraft/70728-block-shelter-mine-terraria-minecraft:-pocket-edition.png".to_string(),
-        Fire => return "https://gamepedia.cursecdn.com/minecraft_gamepedia/archive/3/30/20200127071142!Fire.png?version=2b5a474706c157ed26f2758972649977".to_string(),
-        Coin(_) => return "https://webstockreview.net/images/coin-clipart-fandom-7.png".to_string(),
-        Bin(_) => return "https://cdn.modrinth.com/data/Y9vogxIg/icon.png".to_string(),
+        Garbage(_) => return "img/gargabe-min.png".to_string(),
+        Fire => return "https://www.startpage.com/av/proxy-image?piurl=https%3A%2F%2Fstatic.wikia.nocookie.net%2Fminecraft_gamepedia%2Fimages%2Fa%2Fa5%2FFire.gif%2Frevision%2Flatest%2Fscale-to-width-down%2F1200%3Fcb%3D20200206093505&sp=1708200587T4b29c809aaa089e6e41796bb1654be54492d4141acc2b6ed46233b7f84dcba08".to_string(),
+        Coin(_) => return "img/coin-min.png".to_string(),
+        Bin(_) => return "img/bin-min.png".to_string(),
         Crate(_) => return "https://gamepedia.cursecdn.com/minecraft_gamepedia/b/b3/Chest.png?version=227b3f51ef706a4ce4cf5e91f0e4face".to_string(),
         Bank(_) =>return  "https://vignette.wikia.nocookie.net/pixelpeople/images/a/ae/Bank.png/revision/latest?cb=20130904201633".to_string(),
-        Water(_) => return "https://lh3.googleusercontent.com/MA3xe8ff0oksJ6Z_vBrg2scDLlX_uAXQxSnHfi5Ivc2MBPMWluYYrPGXHcSFWEtTQ8dTX-SQm4GAf-CJZKFkhA=s400".to_string(),
-        Market(_) => return "https://gamepedia.cursecdn.com/minecraft_de_gamepedia/3/3c/Dorf.png".to_string(),
+        Water(_) => return "img/water-min.png".to_string(),
+        Market(_) => return "img/market-min.png".to_string(),
         Fish(_) =>return  "https://gamepedia.cursecdn.com/minecraft_gamepedia/a/ad/Tropical_Fish_JE2_BE2.png".to_string(),
         Building => return "https://gamepedia.cursecdn.com/minecraft_gamepedia/f/f5/Plains_Cartographer_1.png".to_string(),
-        Bush(_) => return "https://gamepedia.cursecdn.com/minecraft_gamepedia/5/54/Berry_Bush_%28The_Aether%29.png?version=bb068bff721dfc749d68f5b87345dd56".to_string(),
-        JollyBlock(_) => return "https://www.tynker.com/minecraft/editor/block/diamond_block/5cc07b98cebfbd1c2154195a/?image=true".to_string(),
-        Scarecrow => return "https://lh3.googleusercontent.com/Wa9r8of1_KTeOtj5wEfDgRxUM2cq3MqrCVdUYkQy8D2hCtNZnuAFdJ1fF8D6lgpQRkRgLkkN8H1Yjnsr-oDclQ=s400".to_string(),
-        Content::None => return "".to_string(),        
-}
-}
-
-fn content_match_night(input: &Content) -> String {
-    match input {
-        Rock(_) =>return  "https://media.forgecdn.net/avatars/84/877/636198378292789888.png".to_string(),
-        Tree(_) =>return  "https://minecraft.wiki/images/thumb/Azalea_Tree.png/250px-Azalea_Tree.png?945ad".to_string(),
-        Garbage(_) => return "https://freepngimg.com/thumb/minecraft/70728-block-shelter-mine-terraria-minecraft:-pocket-edition.png".to_string(),
-        Fire => return "https://gamepedia.cursecdn.com/minecraft_gamepedia/archive/3/30/20200127071142!Fire.png?version=2b5a474706c157ed26f2758972649977".to_string(),
-        Coin(_) => return "https://webstockreview.net/images/coin-clipart-fandom-7.png".to_string(),
-        Bin(_) => return "https://cdn.modrinth.com/data/Y9vogxIg/icon.png".to_string(),
-        Crate(_) => return "https://gamepedia.cursecdn.com/minecraft_gamepedia/b/b3/Chest.png?version=227b3f51ef706a4ce4cf5e91f0e4face".to_string(),
-        Bank(_) =>return  "https://vignette.wikia.nocookie.net/pixelpeople/images/a/ae/Bank.png/revision/latest?cb=20130904201633".to_string(),
-        Water(_) => return "https://lh3.googleusercontent.com/MA3xe8ff0oksJ6Z_vBrg2scDLlX_uAXQxSnHfi5Ivc2MBPMWluYYrPGXHcSFWEtTQ8dTX-SQm4GAf-CJZKFkhA=s400".to_string(),
-        Market(_) => return "https://gamepedia.cursecdn.com/minecraft_de_gamepedia/3/3c/Dorf.png".to_string(),
-        Fish(_) =>return  "https://gamepedia.cursecdn.com/minecraft_gamepedia/a/ad/Tropical_Fish_JE2_BE2.png".to_string(),
-        Building => return "https://gamepedia.cursecdn.com/minecraft_gamepedia/f/f5/Plains_Cartographer_1.png".to_string(),
-        Bush(_) => return "https://gamepedia.cursecdn.com/minecraft_gamepedia/5/54/Berry_Bush_%28The_Aether%29.png?version=bb068bff721dfc749d68f5b87345dd56".to_string(),
-        JollyBlock(_) => return "https://www.tynker.com/minecraft/editor/block/diamond_block/5cc07b98cebfbd1c2154195a/?image=true".to_string(),
-        Scarecrow => return "https://lh3.googleusercontent.com/Wa9r8of1_KTeOtj5wEfDgRxUM2cq3MqrCVdUYkQy8D2hCtNZnuAFdJ1fF8D6lgpQRkRgLkkN8H1Yjnsr-oDclQ=s400".to_string(),
+        Bush(_) => return "https://www.startpage.com/av/proxy-image?piurl=https%3A%2F%2Fstatic.wikia.nocookie.net%2Fpixel-planet%2Fimages%2Fa%2Fa1%2FBush.png%2Frevision%2Flatest%3Fcb%3D20200528081132&sp=1708201176Ta3ba33f3e79d4e9c805b06521401e7896da96d931f45e848b970bd4cb576a5d6".to_string(),
+        JollyBlock(_) => return "img/jolly-min.png".to_string(),
+        Scarecrow => return "img/scarecrow-min.png".to_string(),
         Content::None => return "".to_string(),        
 }
 }
@@ -378,6 +471,7 @@ pub(crate) struct Jerry {
     pub(crate) rs: UseAtomHandle<RobotState>,
     pub(crate) env: UseAtomHandle<EnviromentalState>,
     pub(crate) en: UseAtomHandle<EnergyState>,
+    pub(crate) extras: UseAtomHandle<ExtrasState>,
     pub(crate) tick_counter: usize,
     pub(crate) world_dim: usize,
     pub(crate) active_region: ActiveRegion,
@@ -393,11 +487,12 @@ pub(crate) struct Jerry {
 #[function_component(TimoAi)]
 pub fn timo_ai() -> Html {
     // USESTATES
-    let backState = use_atom::<BackpackState>();
+    let back_state = use_atom::<BackpackState>();
     let world_state = use_atom::<WorldState>();
-    let robotState = use_atom::<RobotState>();
+    let robot_state = use_atom::<RobotState>();
     let env_state = use_atom::<EnviromentalState>();
     let energy_state = use_atom::<EnergyState>();
+    let extra_state = use_atom::<ExtrasState>();
 
     let msg = JsValue::from(format!("Ai Running"));
     info!("{}", msg.as_string().unwrap());
@@ -413,12 +508,12 @@ pub fn timo_ai() -> Html {
                 self.tick_counter += 1;
 
                 // Update UI State
-                let tmpMap = robot_map(&world).unwrap_or_default();
+                let tmp_map = robot_map(&world).unwrap_or_default();
                 let tmp_conditions = look_at_sky(&world);
-                info!("{:?} Internal Map", tmpMap);
-                if tmpMap != self.ws.world {
+                info!("{:?} Internal Map", tmp_map);
+                if tmp_map != self.ws.world {
                     self.ws.set(WorldState {
-                        world: tmpMap,
+                        world: tmp_map,
                         counter: self.ws.counter.clone() + 1,
                     });
                     // info!("CHANGED WORLD");
@@ -442,16 +537,16 @@ pub fn timo_ai() -> Html {
                 // Backpack Updates
                 match event {
                     Event::AddedToBackpack(_, _) | Event::RemovedFromBackpack(_, _) => {
-                        let newBack = self.get_backpack();
-                        let newBackContent = newBack.get_contents();
-                        let newInside: HashMap<Content, usize> = (newBackContent.iter())
+                        let new_back = self.get_backpack();
+                        let new_back_content = new_back.get_contents();
+                        let new_inside: HashMap<Content, usize> = (new_back_content.iter())
                             .map(|content| (content.0.to_owned(), content.1.to_owned()))
                             .collect();
                         // HERE Implement the code to update a state inside the ai function component with the value of backpack size and content
-                        if self.bps.content != newInside {
+                        if self.bps.content != new_inside {
                             self.bps.set(BackpackState {
-                                size: newBack.get_size(),
-                                content: newInside,
+                                size: new_back.get_size(),
+                                content: new_inside,
                             });
                             info!("[ State Update ] New Backpack State");
                         }
@@ -485,21 +580,9 @@ pub fn timo_ai() -> Html {
                         // info!("[ State Update ] NEW COORDS: {:?}", tmp_coords);
                         self.rs.set(RobotState {
                             coord: (tmp_coords.get_row(), tmp_coords.get_col()),
-                            // energy: self.rs.energy.clone()
                         });
                     }
-                    // Event::Ready => todo!(),
-                    // Event::Terminated => todo!(),
-                    // Event::TimeChanged(newEnviromentalConds) => {
-                    //     let worldStatus = self.ws.clone();
-                    //     worldStatus.set(WorldState { world: worldStatus.world.clone(), enviromentalConditions: newEnviromentalConds })
-                    // },
-                    // Event::DayChanged(newEnviromentalConds) => {
-
-                    // },
                     Event::EnergyRecharged(_) | Event::EnergyConsumed(_) => {
-                        // let robotStatus = self.rs.clone();
-                        // robotStatus.set(RobotState {coord: robotStatus.coord, energy: self.get_energy().get_energy_level()});
                         let tmp_energy = self.get_energy().get_energy_level();
                         if self.en.energy != tmp_energy {
                             self.en.set(EnergyState { energy: tmp_energy })
@@ -546,11 +629,12 @@ pub fn timo_ai() -> Html {
         // RUNNING THE GAME
         let r = Jerry {
             robot: Robot::new(),
-            bps: backState.clone(),
+            bps: back_state.clone(),
             ws: world_state.clone(),
-            rs: robotState.clone(),
+            rs: robot_state.clone(),
             env: env_state.clone(),
             en: energy_state.clone(),
+            extras: extra_state.clone(),
             tick_counter: 0,
             world_dim: 0,
             active_region: ActiveRegion {
@@ -584,17 +668,16 @@ pub fn timo_ai() -> Html {
 
 //NICO CODE
 pub(crate) struct MyRobot {
-        pub(crate) robot: Robot,
-        pub(crate) bps: UseAtomHandle<BackpackState>,
-        pub(crate) ws: UseAtomHandle<WorldState>,
-        pub(crate) rs: UseAtomHandle<RobotState>,
-        pub(crate) env: UseAtomHandle<EnviromentalState>,
-        pub(crate) en: UseAtomHandle<EnergyState>
-    }
-
+    pub(crate) robot: Robot,
+    pub(crate) bps: UseAtomHandle<BackpackState>,
+    pub(crate) ws: UseAtomHandle<WorldState>,
+    pub(crate) rs: UseAtomHandle<RobotState>,
+    pub(crate) env: UseAtomHandle<EnviromentalState>,
+    pub(crate) en: UseAtomHandle<EnergyState>,
+}
 
 async fn run_game(run: Rc<RefCell<Result<Runner, LibError>>>) -> () {
-    sleep(3000).await;
+    sleep(1000).await;
     for _ in 0..10000 {
         sleep(1).await;
         info!("[ RUNNER ] Tick");
@@ -626,7 +709,5 @@ async fn sleep(duration: u32) {
             .unwrap();
     });
 
-
     let _ = JsFuture::from(promise).await;
 }
-

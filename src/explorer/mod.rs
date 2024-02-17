@@ -6,6 +6,7 @@ use std::collections::{HashSet};
 use std::rc::Rc;
 use std::cell::RefCell;
 
+use bounce::use_atom;
 use charting_tools::charted_coordinate::ChartedCoordinate;
 use charting_tools::charted_paths::ChartedPaths;
 use charting_tools::ChartingTools;
@@ -16,6 +17,7 @@ use robotics_lib::world::tile::Tile;
 use robotics_lib::world::{World};
 
 use rust_eze_tomtom::TomTom;
+use yew_hooks::use_timeout;
 use crate::biomes::{detect_biome, is_weather_gonna_be_nice_n, is_weather_nice};
 use crate::explorer::ExplorerError::{FailedToGo, FrontierNotAccessible};
 use crate::interface::Jerry;
@@ -26,6 +28,7 @@ use crate::utils::{calculate_spatial_index, robot_map_slice, ActiveRegion, Jerry
 use crate::utils::MissionStatus::{Active, Completed};
 use rust_and_furious_dynamo::dynamo::Dynamo;
 use rand::Rng;
+use crate::interface::ExtrasState;
 
 /*
 Algorithm:
@@ -62,6 +65,10 @@ pub fn explorer_execute(jerry: &mut Jerry, world: &mut World, mission_index: usi
             let probability = rng.gen_range(0.0..1.0);
             if probability < 0.8{
                 *jerry.get_energy_mut() = Dynamo::update_energy();
+                jerry.extras.set(ExtrasState {is_dynamoing: true, tile_size: jerry.extras.tile_size.clone()});
+            } 
+            else {
+                jerry.extras.set(ExtrasState {is_dynamoing: false, tile_size: jerry.extras.tile_size.clone()});
             }
         }
 

@@ -1,12 +1,12 @@
 :root {
-  --tile-size: 4px;
+  --tile-size: 5px;
   --background-color: #f0f0f0;
 }
 
-.tile img {
+/* .tile img {
     height: 1px;
     width: 1px;
-}
+} */
 /* Relative position */
 .tile {
     position: relative;
@@ -51,7 +51,7 @@ body {
   justify-content: center;
   padding: 20px;
   margin: auto;
-  overflow: hidden;
+  overflow: scroll;
   height: 73vh;
   width: 100vw;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -182,4 +182,17 @@ body {
 #enviroment img {
   width: 100px;
   height: 100px;
+}
+
+/* Start Button */
+#start_button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 400px;
+  height: 200px;
+  border: none;
+  border-radius: 5px;
+  margin: auto;
+  margin-top: 40vh;
 }
