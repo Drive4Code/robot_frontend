@@ -42,7 +42,6 @@ pub fn explorer_execute(jerry: &mut Jerry, world: &mut World, mission_index: usi
     let mut counter = 0;
     let mut new_tick = true;
     loop{
-        //println!("");
         //if the robot has less than 100 energy on the new tick, use the dynamo tool with the probability of 0.8
         if new_tick && jerry.get_energy().get_energy_level() < 100{
             let mut rng = rand::thread_rng();
@@ -51,12 +50,6 @@ pub fn explorer_execute(jerry: &mut Jerry, world: &mut World, mission_index: usi
                 *jerry.get_energy_mut() = Dynamo::update_energy();
             }
         }
-
-
-        //Debugging
-        //print!("Initializing ");
-        //let time_initial = std::time::Instant::now();
-        
 
         let map = robot_map(world).unwrap();
         let (robot_view, position) = where_am_i(jerry, world);
@@ -76,22 +69,6 @@ pub fn explorer_execute(jerry: &mut Jerry, world: &mut World, mission_index: usi
             }
         }
 
-        //Debugging
-        //let elapsed_initial = time_initial.elapsed();
-        //println!("took {:?} to initialize ", elapsed_initial);
-    
-        if counter % 10 == 0{
-
-            //Debugging
-            //println!("Updating web page ");
-            //let time_web = std::time::Instant::now();
-            jerry.active_region.top_left = (jerry.get_coordinate().get_row(), jerry.get_coordinate().get_col());
-            jerry.active_region.bottom_right = jerry.active_region.top_left;
-
-            //Debugging
-            //println!("took {:?} to update web page ", time_web.elapsed());
-        }
-        counter += 1;
         new_tick = false;
         //update the frontier if the robot has moved
         if robot_moved{
@@ -133,10 +110,6 @@ pub fn explorer_execute(jerry: &mut Jerry, world: &mut World, mission_index: usi
             return Ok(());
         }
 
-        //Debugging
-        //let time_choose = std::time::Instant::now();
-        //print!("Choosing tile ");
-
         let selected_tile = choose_frontier_tile(jerry, charted_paths, mission_index);
         //if the frontier is not accessible, the robot should stop executing the mission
         if selected_tile.is_err(){
@@ -164,12 +137,6 @@ pub fn explorer_execute(jerry: &mut Jerry, world: &mut World, mission_index: usi
 
             return Ok(());
         }
-
-        //Debugging
-        //println!("took {:?} to choose tile ", time_choose.elapsed());
-        //let time_go = std::time::Instant::now();
-        //print!("Go to Tile ");
-
 
         //try to reach the selected tile or throw an error if the cost to get there is > 1000 or > than the robot has
         let selected_tile = selected_tile.unwrap().0;
@@ -236,9 +203,6 @@ pub fn explorer_execute(jerry: &mut Jerry, world: &mut World, mission_index: usi
             return Err(JerryStatus::MissionExecutionError);
         }
         else{
-
-            //Debugging
-            //println!("took {:?} to go to tile ", time_go.elapsed());
 
             robot_moved = true;
             continue;
