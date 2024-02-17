@@ -22,10 +22,7 @@ use crate::sector_analyzer::{analyzer_execute, SectorData};
 pub const SECTOR_DIMENSION: usize = 70;
 pub struct Mission {
     pub name: String,
-    pub description: Option<String>,
-    pub goal_tracker: Option<GoalTracker>,
     pub status: MissionStatus,
-    pub probability_of_cheating: f64,
     pub additional_data: Option<Box<dyn Any>>,
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -66,8 +63,7 @@ pub enum JerryStatus{
     Common(LibError),
     ExpectingNiceWeather,
 }
-pub(crate) fn execute_mission (jerry: &mut Jerry, world: &mut World){
-
+pub fn execute_mission (jerry: &mut Jerry, world: &mut World){
 
     //after every 2 completed explorers, need to build the roads
     //so if the # of completed explorers is even, set other active explorers to pause and continue with the road builders
@@ -83,8 +79,7 @@ pub(crate) fn execute_mission (jerry: &mut Jerry, world: &mut World){
                 match mission.status{
                     MissionStatus::Completed => completed_explorers += 1,
                     MissionStatus::Paused => waiting_explorers += 1,
-                    MissionStatus::Active => active_explorers += 1,
-                    _ => {}
+                    MissionStatus::Active  | MissionStatus::New => active_explorers += 1,
                     
                 }
             }
@@ -92,8 +87,7 @@ pub(crate) fn execute_mission (jerry: &mut Jerry, world: &mut World){
                 match  mission.status{
                     MissionStatus::Completed => completed_road_builders += 1,
                     MissionStatus::Paused => waiting_road_builders += 1,
-                    MissionStatus::Active => active_road_builders += 1,
-                    _ => {}
+                    MissionStatus::Active  | MissionStatus::New => active_road_builders += 1,
                     
                 }
             }
@@ -105,7 +99,7 @@ pub(crate) fn execute_mission (jerry: &mut Jerry, world: &mut World){
     //after every 2 completed explorers, set road builders to active and pause the active explorers
     if completed_explorers > 0 && completed_explorers % 2 == 0 && waiting_road_builders > 0{
         for mission in jerry.missions.iter_mut(){
-            if mission.name == "Explore" && mission.status == MissionStatus::Active{
+            if mission.name == "Explore" && (mission.status == MissionStatus::Active || mission.status == MissionStatus::New){
                 mission.status = MissionStatus::Paused;
             }
             if mission.name == "Road Builder" && mission.status == MissionStatus::Paused{
@@ -124,13 +118,17 @@ pub(crate) fn execute_mission (jerry: &mut Jerry, world: &mut World){
             }
         }
     }
-    let mission = jerry.missions.iter_mut().enumerate().find(|(i, mission)| mission.status == MissionStatus::Active);
+    let mission = jerry.missions.iter_mut().enumerate().find(|(i, mission)| 
+    (mission.status == MissionStatus::Active) || (mission.status == MissionStatus::New));
     if mission.is_none() {
         println!("I got nothing to do!");
     }
     if let Some((index, mission)) = mission{
         match mission.name.as_str(){
             | "Explore" => {
+                if mission.status == MissionStatus::New{
+                    mission.status = MissionStatus::Active;
+                }
                 println!("Mission Explorer {:?}", explorer_execute(jerry, world, index));
             }
             | "Road Builder" => {

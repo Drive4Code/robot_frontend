@@ -12,6 +12,7 @@ pub mod utils;
 pub mod sector_analyzer;
 pub mod road_builder;
 pub mod resources;
+pub mod fast_paths;
 
 use interface::{Main, TimoAi};
 
