@@ -144,15 +144,15 @@ pub fn main() -> Html {
 
 #[function_component(BackP)]
 pub fn backpack() -> Html {
-    let backState = use_atom::<BackpackState>();
+    let back_state = use_atom::<BackpackState>();
     html! {
         <div id={"backpack"}>
             <h2>{"Backpack"}</h2>
             <hr/>
-            {"Size: "}{ &backState.size}
+            {"Size: "}{ &back_state.size}
             <br/>
             {"Contents: "} //{ format!("{:?}", &backState.content)}
-            { for backState.content.iter().map(|content| {
+            { for back_state.content.iter().map(|content| {
                 match content.1 {
                     0 => html! {<></>},
                     _ => html! {
@@ -172,7 +172,7 @@ pub struct BackItemProps {
 }
 
 #[function_component(BackItem)]
-fn backItem(props: &BackItemProps) -> Html {
+fn back_item(props: &BackItemProps) -> Html {
     let img_display: String = content_match_day(&props.content);
     html! {
         <div class={classes!("back_item")}>
@@ -221,7 +221,7 @@ fn match_forecast(conditions: &WeatherType) -> String {
 #[function_component(MapView)]
 pub fn map_view() -> Html {
     let world_state = use_atom::<WorldState>();
-    let robotState = use_atom::<RobotState>();
+    let robot_state = use_atom::<RobotState>();
 
     html! {
         <div id={"robot_view"}>
@@ -233,7 +233,7 @@ pub fn map_view() -> Html {
                                 Some(tile) => html! {
                                     <div class={"tile"}>
                                     <MapTile tile={tile.clone()}/>
-                                    {if i == robotState.coord.0.clone() && j == robotState.coord.1.clone() {
+                                    {if i == robot_state.coord.0.clone() && j == robot_state.coord.1.clone() {
                                        html! {<img id={"robot"} src={"https://icons.iconarchive.com/icons/google/noto-emoji-smileys/1024/10103-robot-face-icon.png"} />}
                                     } else {
                                         html! {}
@@ -320,7 +320,7 @@ pub fn map_tile_content(props: &MapTileProps) -> Html {
     let hour: u8 = cond_state.time[0..2]
         .to_owned()
         .parse::<u8>()
-        .expect("Bought the flight to Cali racks & condoms in my suitcase");
+        .expect("Expected a u8 error");
     match hour {
         19..=23 | 00..=05 => {
             img_display = content_match_day(&props.tile.content);
@@ -938,7 +938,7 @@ pub fn nico_ai() -> Html {
                     }
                 },
                 -1 => {
-                    for n in 1..=10 {
+                    for _ in 1..=10 {
                         if robot.get_coordinate().get_col() == 0 {
                             recover_oob(robot, world, Direction::Left);
                             //street_paving_mode(robot, world, cycle);
