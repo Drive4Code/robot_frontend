@@ -4,7 +4,7 @@ use std::hash::Hash;
 use bessie::bessie::{road_paving_machine, RpmError, State};
 use charting_tools::charted_map::MapKey;
 use rand::Rng;
-use robotics_lib::interface::{destroy, go, robot_map, teleport, where_am_i, Direction};
+use robotics_lib::interface::{destroy, go, put, robot_map, teleport, where_am_i, Direction};
 use robotics_lib::runner::Runnable;
 use robotics_lib::utils::{go_allowed, LibError};
 use robotics_lib::world::tile::{Content, Tile, TileType};
@@ -12,6 +12,7 @@ use robotics_lib::world::World;
 use rust_and_furious_dynamo::dynamo::{self, Dynamo};
 use rust_eze_tomtom::{path, TomTom};
 use crate::explorer::{coordinate_to_direction, is_adjacent};
+use crate::fast_paths::{dijkstra, path_to_coordinates};
 use crate::resources::{self, empty_the_backpack, get_content, ResourceCollectorError};
 use crate::interface::Jerry;
 use crate::sector_analyzer::SectorData;
@@ -25,22 +26,51 @@ use crate::utils::MissionStatus::Active;
 use crate::utils::MissionStatus::Completed;
 use crate::road_builder::RoadBuilderError::RoadNonAccessible;
 
-//plans a road between two nodes
-//returns a vector of charted coordinates which is the sequence of tiles to go through
-//it also cuts the ends of the path if they are shallow water or deep water
-
-pub fn plan_road(jerry: &mut Jerry, world: &mut World, node1: (usize, usize), node2: (usize, usize)) -> Vec<ChartedCoordinate> {
-    let mut charted_paths  = ChartingTools::tool::<ChartedPaths>()
-            .expect("too many tools used!");
+const TO_REMOVE_FROM_BP: usize = 7;
+pub fn plan_node_2_node(jerry: &mut Jerry, world: &mut World, node1: (usize, usize), node2: (usize, usize)) -> Vec<ChartedCoordinate> {
+    let target = HashSet::from([node2]);
+    let road = HashSet::from([ChartedCoordinate(node2.0, node2.1)]);
     let map = robot_map(world).unwrap();
-    charted_paths.init(&map, world);
-    let from = ChartedCoordinate::new(node1.0, node1.1);
-    let to = ChartedCoordinate::new(node2.0, node2.1);
-    let path = charted_paths.shortest_path(from, to);
-    if let Some(path) = path{
-        return path.1;
+    if let Ok(path) = dijkstra(jerry, world, &map, node1, target, Some(Some(&road))){
+        return path_to_coordinates(&path)
     }
+    if let Err(error) = dijkstra(jerry, world, &map, node1, HashSet::new(), Some(Some(&road))){
+        println!("{:?}", error);
+    }
+    println!("Failed to plan node to node");
     Vec::new()
+}
+pub fn plan_node_2_road(jerry: &mut Jerry, world: &mut World, node1: (usize, usize), local_road: Option<&HashSet<ChartedCoordinate>>) -> Vec<ChartedCoordinate> {
+    let map = robot_map(world).unwrap();
+    if let Some(road) = local_road{
+        if let Ok(path) = dijkstra(jerry, world, &map, node1, HashSet::new(), Some(Some(&road))){
+            return path_to_coordinates(&path)
+        }
+        if let Err(error) = dijkstra(jerry, world, &map, node1, HashSet::new(), Some(Some(&road))){
+            println!("{:?}", error);
+        }
+    }
+    //else plan the road to the global road
+    if let Ok(path) = dijkstra(jerry, world, &map, node1, HashSet::new(), Some(None)){
+        return path_to_coordinates(&path)
+    }
+    if let Err(error) = dijkstra(jerry, world, &map, node1, HashSet::new(), Some(None)){
+        println!("{:?}", error);
+    }
+    println!("Failed to plan node_to_road");
+    Vec::new()
+}
+pub fn plan_road_2_global(jerry: &mut Jerry, world: &mut World, road: &HashSet<ChartedCoordinate>) -> Vec<ChartedCoordinate> {
+    let mut ret = Vec::new();
+    for node in road.iter(){
+        let path1 = plan_node_2_road(jerry, world, (node.0, node.1), None);
+        if (path1.len() < ret.len() && path1.len() > 0) || ret.is_empty(){
+            println!("Path1 len {}", path1.len());
+            ret = path1;
+        }
+    }
+    if ret.len() == 0 {println!("Failed to plan road_to_global");}
+    ret
 }
 fn shrink_path(path: &mut Vec<ChartedCoordinate>, map: &Vec<Vec<Option<Tile>>>){
     let mut i = 0;
@@ -70,22 +100,27 @@ fn shrink_path(path: &mut Vec<ChartedCoordinate>, map: &Vec<Vec<Option<Tile>>>){
 //the function gets the sector data and adds new missions for the robot
 pub fn generate_road_builders(jerry: &mut Jerry, world: &mut World, sector_data: SectorData){
     let nodes = sector_data.nodes;
-    let resources = sector_data.resources;
     let mut missions = 0;
     let map = robot_map(world).unwrap();
+    let first_road_to_pave = jerry.road_tiles.is_empty();
      //if there is just one node
      if nodes.len() == 1{
         //we need to connect it to the global road (if it exists)
         //if it does not exist, it becomes a global road
-        if jerry.road_tiles.is_empty(){
-            jerry.road_tiles.insert(ChartedCoordinate::new(nodes[0].0, nodes[0].1));
-        }
-        else {
-            //else we find a path to the global road
-            let target = find_nearest_road_tile(&map, nodes[0], &jerry.road_tiles);
-            let path = plan_road(jerry, world, nodes[0], target);
-            let status = ConnectionStatus::Global;
-            let mission = new_road_builder(&path, status);
+        if !first_road_to_pave{
+            let mut path = plan_node_2_road(jerry, world, nodes[0], None);
+            
+            //strange bug, the path is empty
+            if path.is_empty(){
+                return;
+            }
+
+            println!("1 node, the global road exists. Connecting {:?} to {:?}, path len is {:?}", nodes[0], path[path.len() - 1], path.len());
+            shrink_path(&mut path, &map);
+            for tile in &path{
+                jerry.road_tiles.insert(tile.clone());
+            }
+            let mission = new_road_builder(&path);
             jerry.missions.push_back(mission);
             missions += 1;
         }
@@ -95,30 +130,35 @@ pub fn generate_road_builders(jerry: &mut Jerry, world: &mut World, sector_data:
      //we build the road between them and then connect the road to the global road
         else if nodes.len() == 2{
             //road between the nodes
-            let path = plan_road(jerry, world, nodes[0], nodes[1]);
+            let mut path = plan_node_2_node(jerry, world, nodes[0], nodes[1]);
+            shrink_path(&mut path, &map);
+
+            println!("2 nodes, Connecting in sector {:?} to {:?}, path len is {:?}", nodes[0], nodes[1], path.len());
+            //add the tiles to the sector road
             let mut to_pave = HashSet::new();
             for tile in &path {
                 to_pave.insert(tile.clone());
             }
-            let status = ConnectionStatus::NotConnected(0);
-            let mission = new_road_builder(&path, status);
+
+            let mission = new_road_builder(&path);
             jerry.missions.push_back(mission);
             missions += 1;
 
-            //if there is no global road, the road becomes global
-            if jerry.road_tiles.is_empty(){
+            if !first_road_to_pave{
+                //connecting the road to the global road if it exists
+                //planning the road between the roads
+                let mut path = plan_road_2_global(jerry, world, &to_pave);
+                println!("2 nodes, road exists, connecting to global, path len is {:?}", path.len());
+                shrink_path(&mut path, &map);
                 for tile in &path{
                     jerry.road_tiles.insert(tile.clone());
                 }
-            }
-            else{
-                //connecting the road to the global road if it exists
-                let (node1, node2) = nodes_to_connect_2_roads(&to_pave, &jerry.road_tiles);
-                let path = plan_road(jerry, world, (node1.0, node1.1), (node2.0, node2.1));
-                let status = ConnectionStatus::Global;
-                let mission = new_road_builder(&path, status);
+                let mission = new_road_builder(&path);
                 jerry.missions.push_back(mission);
                 missions += 1;
+            }
+            for tile in &path{
+                jerry.road_tiles.insert(tile.clone());
             }
         }
         //if there are more than two nodes
@@ -128,47 +168,55 @@ pub fn generate_road_builders(jerry: &mut Jerry, world: &mut World, sector_data:
         else{
             //road between the two most distant nodes
             let (node1, node2) = get_2_furthest_nodes(&nodes);
-            let path = plan_road(jerry, world, (node1.0, node1.1), (node2.0, node2.1));
+            let mut path = plan_node_2_node(jerry, world, (node1.0, node1.1), (node2.0, node2.1));
+            shrink_path(&mut path, &map);
+            println!("More than 2 nodes, Connecting in sector the two most distant {:?} to {:?}, path len {:?}", node1, node2, path.len());
+
+            //add the tiles to the sector road
             let mut to_pave = HashSet::new();
             for tile in &path {
                 to_pave.insert(tile.clone());
             }
-            let status = ConnectionStatus::NotConnected(0);
-            let mission = new_road_builder(&path, status);
+
+            let mission = new_road_builder(&path);
             jerry.missions.push_back(mission);
             missions += 1;
 
             //connecting the other nodes to the road
             for node in nodes.iter(){
                 if *node != (node1.0, node1.1) && *node != (node2.0, node2.1){
-                    let target = find_nearest_road_tile(&map, *node, &to_pave);
-                    let path = plan_road(jerry, world, *node, target);
+                    let mut path = plan_node_2_road(jerry, world, *node, Some(&to_pave));
+                    shrink_path(&mut path, &map);
+
                     //add the new path tiles to the sector road
                     for tile in &path {
                         to_pave.insert(tile.clone());
                     }
-                    let status = ConnectionStatus::Local(0);
-                    let mission = new_road_builder(&path, status);
+
+                    let mission = new_road_builder(&path);
                     jerry.missions.push_back(mission);
                     missions += 1;
                 }
             }
             //check if the global road exists
-            //if it does, connect the local road network to the global road
-            if jerry.road_tiles.is_empty(){
-                for tile in &path{
-                    jerry.road_tiles.insert(tile.clone());
-                }
+            if !first_road_to_pave{
+            //connecting the local road network to the global road
+            let path = plan_road_2_global(jerry, world, &to_pave);
+            println!("More than 2 nodes, road exists, connecting to global");
+            let mission = new_road_builder(&path);
+            for tile in &path{
+                jerry.road_tiles.insert(tile.clone());
             }
-            else{
-                //connecting the local road network to the global road
-                let (node1, node2) = nodes_to_connect_2_roads(&to_pave, &jerry.road_tiles);
-                let path = plan_road(jerry, world, (node1.0, node1.1), (node2.0, node2.1));
-                let status = ConnectionStatus::Global;
-                let mission = new_road_builder(&path, status);
-                jerry.missions.push_back(mission);
-                missions += 1;
+            jerry.missions.push_back(mission);
+            missions += 1;
             }
+            for tile in &to_pave{
+                jerry.road_tiles.insert(tile.clone());
+            }
+             
+        }
+        for node in nodes.iter(){
+            jerry.road_tiles.insert(ChartedCoordinate(node.0, node.1));
         }
     println!("Missions {}", missions);
 }
@@ -178,19 +226,15 @@ pub fn generate_road_builders(jerry: &mut Jerry, world: &mut World, sector_data:
 //calls the road builder
 //should save the last paved to be able to come back after collecting resources
 
-pub fn new_road_builder(path: &Vec<ChartedCoordinate>, connect_to: ConnectionStatus) -> Mission{
+pub fn new_road_builder(path: &Vec<ChartedCoordinate>) -> Mission{
     let mut to_pave = HashSet::new();
     for tile in path {
         to_pave.insert(tile.clone());
     }
-
     Mission {
         name: "Road Builder".to_string(),
-        description: None,
-        probability_of_cheating: 0.7,
-        goal_tracker: None,
         status: Paused,
-        additional_data: Some(Box::new(RoadBuilderData{to_pave: to_pave, paved: HashSet::new(), connect: connect_to})),
+        additional_data: Some(Box::new(RoadBuilderData{to_pave: to_pave, paved: HashSet::new()})),
     }
 }
 //executes the road builder mission
@@ -219,11 +263,10 @@ pub fn road_builder_execute(jerry: &mut Jerry, world: &mut World, mission_index:
                 *jerry.get_energy_mut() = Dynamo::update_energy();
             }
         }
-
-        //initializing necessary tools and data
+        
+        //initializing the necessary tools and data
 
         let map = robot_map(world).unwrap();
-        let (robot_view, position) = where_am_i(jerry, world);
         let mut charted_paths  = ChartingTools::tool::<ChartedPaths>()
             .expect("too many tools used!");
         charted_paths.init(&map, world);
@@ -232,7 +275,8 @@ pub fn road_builder_execute(jerry: &mut Jerry, world: &mut World, mission_index:
         
         //debugging
         println!("Paving {:?}", mission_index);
-        //
+        //update web page
+        //update_web_page(jerry, &map);
 
         //completion condition
         if road_builder_data.to_pave.is_empty(){
@@ -250,7 +294,7 @@ pub fn road_builder_execute(jerry: &mut Jerry, world: &mut World, mission_index:
         //try to reach the tiles adjacent to the selected tile or throw an error if it is too expensive
         let selected_tile = selected_tile.unwrap().0;
         let selected_tile_cost = selected_tile.1;
-        //panic if the selected tile is too expensive <- REFACTOR THIS
+        //panic if the selected tile is too expensive
         if selected_tile_cost > 1000{
             panic!("Too Expensive bro")
         }
@@ -275,6 +319,7 @@ pub fn road_builder_execute(jerry: &mut Jerry, world: &mut World, mission_index:
                 }
                 //if cannot pave the tile, skip it, remove it from the to_pave set and continue
                 | RoadBuilderError::CannotPaveTile => {
+                    println!("Skipping tile {:?}", map[selected_tile.0][selected_tile.1]);
                     road_builder_data.to_pave.remove(&selected_tile);
                     continue;
                 }
@@ -339,11 +384,19 @@ fn go_and_pave(jerry: &mut Jerry, map: &Vec<Vec<Option<Tile>>>, world: &mut Worl
 fn bessie_controller(jerry: &mut Jerry, map: &Vec<Vec<Option<Tile>>>, world: &mut World, direction: Direction, mission_index: usize) -> Result<(), RoadBuilderError>{
     let vent_tool1 = jerry.vent.clone();
     let vent_tool2 = jerry.vent.clone();
-    if let Err(error) = bessie::bessie::road_paving_machine(jerry, world, direction.clone(), State::MakeRoad){
+    if let Err(error) = road_paving_machine(jerry, world, direction.clone(), State::MakeRoad){
         //if not enough energy, return an error without removing the tile from the frontier
         match error{
             //Normally, should not happen but we'll skip the tile
-            | RpmError::CannotPlaceHere => {return Err(RoadBuilderError::CannotPaveTile);}
+            //The error occurs when trying to pave the street
+            | RpmError::CannotPlaceHere => {
+                let coord = direction_to_coordinate((jerry.get_coordinate().get_row(), jerry.get_coordinate().get_col()),direction.clone());
+                if map[coord.0][coord.1].as_ref().unwrap().tile_type == TileType::Street{
+                    println!("There's a street already");
+                }
+                println!("Cannot place here {:?}", map[coord.0][coord.1]);
+                return Err(RoadBuilderError::CannotPaveTile);
+            }
             //try to destroy the content and pave again, if the tile does contain a crate, skip it and do not pave returning a specific error
             | RpmError::MustDestroyContentFirst => {
                 let tile_coord = direction_to_coordinate((jerry.get_coordinate().get_row(), jerry.get_coordinate().get_col()), direction.clone());
@@ -356,12 +409,13 @@ fn bessie_controller(jerry: &mut Jerry, map: &Vec<Vec<Option<Tile>>>, world: &mu
                     match error{
                         | LibError::NotEnoughEnergy => return Err(RoadBuilderError::NotEnoughEnergy),
                         //if not enough space in the backpack to destroy the content
-                        | LibError::NotEnoughSpace(space_needed) => {
+                        | LibError::NotEnoughSpace(added) => {
                             vent_tool1.borrow_mut().create_waypoint(jerry, 1000);
                             let mission = jerry.missions.get_mut(mission_index).unwrap();
                             let road_builder_data = mission.additional_data.as_mut().unwrap().downcast_mut::<RoadBuilderData>().unwrap();
                             let planned_road = &road_builder_data.to_pave.clone();
-                            if let Err(error) = empty_the_backpack(jerry, world, Some(planned_road), space_needed){
+                            println!("Not enough space in the backpack, i have added {}", added);
+                            if let Err(error) = empty_the_backpack(jerry, world, Some(planned_road), TO_REMOVE_FROM_BP - added){
                                 match error{
                                     //if not enough energy, return the error
                                     | ResourceCollectorError::NotEnoughEnergy => return Err(RoadBuilderError::NotEnoughEnergy),
@@ -373,7 +427,7 @@ fn bessie_controller(jerry: &mut Jerry, map: &Vec<Vec<Option<Tile>>>, world: &mu
                                 if let Err(error) = vent_tool1.borrow_mut().vent_waypoint(jerry, world, 1000){
                                     match error{
                                         //pretty much the only error that can happen
-                                        | vent_tool_ascii_crab::VentError::NotEnoughEnergy => return Err(RoadBuilderError::NotEnoughEnergy),
+                                        | vent_tool_ascii_crab::VentError::NotEnoughEnergy => return Err(RoadBuilderError::NotEnoughEnergy),   
                                         //otherwise, idk
                                         | _ => panic!("{:?}", error),
                                     }
@@ -384,7 +438,10 @@ fn bessie_controller(jerry: &mut Jerry, map: &Vec<Vec<Option<Tile>>>, world: &mu
 
                             }
                         }
-                        | _ => {panic!("{:?}", error)}
+                        //if undefined error occurs
+                        | _ => {
+                            panic!("{:?}", error);
+                        }
                     }
                 }
                 //if the content is successfully destroyed, try to pave again
@@ -396,7 +453,6 @@ fn bessie_controller(jerry: &mut Jerry, map: &Vec<Vec<Option<Tile>>>, world: &mu
             | RpmError::NoRockHere | RpmError::NotEnoughMaterial=> {
                 //need to search for rocks
                 //remember the current position to return back after the search using the vent tool waypoint
-                let current_position = (jerry.get_coordinate().get_row(), jerry.get_coordinate().get_col());
                 vent_tool2.borrow_mut().create_waypoint(jerry, 1000);
                 let mission = jerry.missions.get_mut(mission_index).unwrap();
                 let road_builder_data = mission.additional_data.as_mut().unwrap().downcast_mut::<RoadBuilderData>().unwrap();
@@ -408,7 +464,7 @@ fn bessie_controller(jerry: &mut Jerry, map: &Vec<Vec<Option<Tile>>>, world: &mu
                         //Normally, should not happen
                         | ResourceCollectorError::BackPackIsFull => panic!("Backpack is full"),
                         //if the path to the content is not found
-                        |ResourceCollectorError::PathNotFound => return Err(RoadBuilderError::CannotGetMaterial),
+                        |ResourceCollectorError::PathNotFound | ResourceCollectorError::NoContentFound => return Err(RoadBuilderError::CannotGetMaterial),
                         _ => panic!("Unexpected {:?}", error),
                     }
                 }
@@ -429,9 +485,48 @@ fn bessie_controller(jerry: &mut Jerry, map: &Vec<Vec<Option<Tile>>>, world: &mu
 
             }
             | RpmError::NotEnoughEnergy => return Err(RoadBuilderError::NotEnoughEnergy),
-            _ => {panic!("{:?}", error)}
+            //Normally doesn't happen, usually on the mountain tile
+            | _ => {
+                let coord = direction_to_coordinate((jerry.get_coordinate().get_row(), jerry.get_coordinate().get_col()),direction.clone());
+                if map[coord.0][coord.1].as_ref().unwrap().tile_type == TileType::Mountain{
+                    //Try to pave the mountain tile
+                    //If it fails, empty the backpack and try again
+                    if let Err(error) = put(jerry, world, Content::None, 0, direction.clone()){
+                        match error{
+                            | LibError::NotEnoughEnergy => return Err(RoadBuilderError::NotEnoughEnergy),
+                            | LibError::NotEnoughSpace(added) => {
+                                vent_tool2.borrow_mut().create_waypoint(jerry, 1000);
+                                let mission = jerry.missions.get_mut(mission_index).unwrap();
+                                let road_builder_data = mission.additional_data.as_mut().unwrap().downcast_mut::<RoadBuilderData>().unwrap();
+                                let planned_road = &road_builder_data.to_pave.clone();
+                                if let Err(error) = empty_the_backpack(jerry, world, Some(planned_road), TO_REMOVE_FROM_BP - added){
+                                    match error{
+                                        | ResourceCollectorError::NotEnoughEnergy => return Err(RoadBuilderError::NotEnoughEnergy),
+                                        | _ => panic!("{:?}", error),
+                                    }
+                                }
+                                else{
+                                    if let Err(error) = vent_tool2.borrow_mut().vent_waypoint(jerry, world, 1000){
+                                        match error{
+                                            | vent_tool_ascii_crab::VentError::NotEnoughEnergy => return Err(RoadBuilderError::NotEnoughEnergy),
+                                            | _ => panic!("{:?}", error),
+                                        }
+                                    }
+                                    drop(vent_tool2);
+                                    return bessie_controller(jerry, map, world, direction, mission_index);
+                                }
+                            }
+                            | _ => panic!("{:?}", error),
+                        }
+                    }
+                }
+                else{
+                    panic!("{:?}", error);
+                }
+            }
         }
     }
+    println!("Paved successfully!");
     Ok(())   
 }
 //choose the tile to pave with the cheapest cost of going to
@@ -469,73 +564,7 @@ fn choose_tile_to_pave(jerry: &mut Jerry, tool: ChartedPaths, mission_index: usi
     }
     return Err(RoadNonAccessible);
 }
-pub fn get_road_required_resources(path: &Vec<ChartedCoordinate>, map: &Vec<Vec<Option<Tile>>>) -> (usize, usize, usize){
-    let mut energy = 0;
-    let mut rocks = 0;
-    let mut backpack_space = 0;
-    for coord in path.iter(){
-        if let Some(tile) =  &map[coord.0][coord.1]{
-            match tile.tile_type{
-                | TileType::Lava => {
-                    rocks += 3;
-                    energy += 9;
-                }
-                | TileType::DeepWater => {
-                    rocks += 3;
-                    energy += 6;
-                }
-                | TileType::ShallowWater => {
-                    rocks += 2;
-                    energy += 2;
-                }
-                | TileType::Teleport(_) | TileType::Street=> {}
-                | _ => {
-                    rocks += 1;
-                    energy += 1;
-                }
-            }
-            match tile.content{
-                | Content::None => {}
-                | Content::Bush(amount) | Content::Tree(amount) | Content::Fish(amount) | Content::Water(amount) => {
-                    energy += tile.content.properties().cost() * amount;
-                    backpack_space += amount;
-                }
-                | Content::Fire => {
-                    energy += tile.content.properties().cost() * tile.content.properties().max();
-                    backpack_space += tile.content.properties().max();
-                }
-                | _ => {}
-            }
-        }
-    }
-    (rocks, energy, backpack_space)
-}
 
-pub fn find_nearest_road_tile(map: &Vec<Vec<Option<Tile>>>, coord: (usize, usize), road: &HashSet<ChartedCoordinate>) -> (usize, usize){
-    let mut radius: i32 = 1;
-    loop{
-        if radius as usize > map.len() && radius as usize > map[0].len(){
-            panic!("No road found");
-        }
-        for i in -radius..=radius{
-            for j in -radius..=radius{
-                if coord.0 as i32 + i < 0 || 
-                    coord.1 as i32 + j < 0 || 
-                    coord.0 as i32 + i >= map.len() as i32 || 
-                    coord.1 as i32 + j >= map[0].len() as i32{
-                    continue;
-                }
-                else{
-                    let new_coord = (coord.0 as i32 + i, coord.1 as i32 + j);
-                    if road.contains(&ChartedCoordinate::new(new_coord.0 as usize, new_coord.1 as usize)){
-                        return (new_coord.0 as usize, new_coord.1 as usize);
-                    }
-                }
-            }
-        }
-        radius += 1;
-    }
-}
 fn get_2_furthest_nodes(nodes: &Vec<(usize, usize)>) -> (ChartedCoordinate, ChartedCoordinate){
     let mut max_distance = 0;
     let mut node1 = ChartedCoordinate::new(0, 0);
@@ -552,22 +581,7 @@ fn get_2_furthest_nodes(nodes: &Vec<(usize, usize)>) -> (ChartedCoordinate, Char
     }
     (node1, node2)
 }
-fn nodes_to_connect_2_roads(road1: &HashSet<ChartedCoordinate>, road2: &HashSet<ChartedCoordinate>) -> (ChartedCoordinate, ChartedCoordinate) {
-    let mut min_distance = 0;
-    let mut node1 = ChartedCoordinate::new(0, 0);
-    let mut node2 = ChartedCoordinate::new(0, 0);
-    for n1 in road1.iter(){
-        for n2 in road2.iter(){
-            let distance = (n1.0 as i32 - n2.0 as i32).abs() + (n1.1 as i32 - n2.1 as i32).abs();
-            if distance < min_distance || min_distance == 0{
-                min_distance = distance;
-                node1 = *n1;
-                node2 = ChartedCoordinate::new(n2.0, n2.1);
-            }
-        }
-    }
-    (node1, node2)
-}
+
 fn direction_to_coordinate(coord: (usize, usize), direction: Direction) -> (usize, usize){
     match direction{
         | Direction::Up => (coord.0 - 1, coord.1),
@@ -587,11 +601,4 @@ pub enum RoadBuilderError{
 pub struct RoadBuilderData{
     to_pave: HashSet<ChartedCoordinate>,
     paved: HashSet<ChartedCoordinate>,
-    connect: ConnectionStatus,
-}
-#[derive(Debug, Clone, PartialEq, Copy)]
-pub enum ConnectionStatus{
-    NotConnected(usize), //usize is a spatial index of the main road of the sector
-    Global,  //if we connect the node to the global road
-    Local(usize), //usize is a spatial index of the main toad of the sector to which we connect the road
 }

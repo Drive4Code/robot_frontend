@@ -20,35 +20,22 @@ use rust_eze_tomtom::TomTom;
 use yew_hooks::use_timeout;
 use crate::biomes::{detect_biome, is_weather_gonna_be_nice_n, is_weather_nice};
 use crate::explorer::ExplorerError::{FailedToGo, FrontierNotAccessible};
+use crate::fast_paths::go_to_coordinates;
 use crate::interface::Jerry;
 use crate::road_builder::generate_road_builders;
 use crate::sector_analyzer::{analyzer_execute, new_sector_analyzer};
 use crate::utils::{calculate_spatial_index, robot_map_slice, ActiveRegion, JerryStatus, Mission};
 
-use crate::utils::MissionStatus::{Active, Completed};
+use crate::utils::MissionStatus::{Active, Completed, New};
 use rust_and_furious_dynamo::dynamo::Dynamo;
 use rand::Rng;
 use crate::interface::ExtrasState;
-
-/*
-Algorithm:
-   Get the frontier tiles (datatype?) - initialize in the beginning
-   Find the one with the cheapest cost to go (maybe it makes sense to limit the search with some distance)
-   ----How to find the cheapest?----
-   If no frontier tiles within 3 tiles around -> iterate over all frontier tiles
-   Go to the tile
-   Remove the tile from the frontier
-   Update the frontier
-*/
 
 pub fn new_explorer(jerry: &mut Jerry, world: &mut World, spatial_index: usize) -> Mission{
     let (frontier, frontier_hs) = initialize_frontier(jerry, world);
     Mission{
         name: "Explore".to_string(),
-        description: None,
-        probability_of_cheating: 0.8,
-        goal_tracker: None,
-        status: Active,
+        status: New,
         additional_data: Some(Box::new(ExplorerData{frontier, frontier_hs, spatial_index})),
     }
 }
@@ -58,7 +45,6 @@ pub fn explorer_execute(jerry: &mut Jerry, world: &mut World, mission_index: usi
     let mut counter = 0;
     let mut new_tick = true;
     loop{
-        //println!("");
         //if the robot has less than 100 energy on the new tick, use the dynamo tool with the probability of 0.8
         if new_tick && jerry.get_energy().get_energy_level() < 100{
             let mut rng = rand::thread_rng();
@@ -71,12 +57,6 @@ pub fn explorer_execute(jerry: &mut Jerry, world: &mut World, mission_index: usi
                 jerry.extras.set(ExtrasState {is_dynamoing: false, tile_size: jerry.extras.tile_size.clone()});
             }
         }
-
-
-        //Debugging
-        //print!("Initializing ");
-        //let time_initial = std::time::Instant::now();
-        
 
         let map = robot_map(world).unwrap();
         let (robot_view, position) = where_am_i(jerry, world);
@@ -96,23 +76,6 @@ pub fn explorer_execute(jerry: &mut Jerry, world: &mut World, mission_index: usi
             }
         }
 
-        //Debugging
-        //let elapsed_initial = time_initial.elapsed();
-        //println!("took {:?} to initialize ", elapsed_initial);
-    
-        if counter % 10 == 0{
-
-            //Debugging
-            //println!("Updating web page ");
-            //let time_web = std::time::Instant::now();
-
-            jerry.active_region.top_left = (jerry.get_coordinate().get_row(), jerry.get_coordinate().get_col());
-            jerry.active_region.bottom_right = jerry.active_region.top_left;
-
-            //Debugging
-            //println!("took {:?} to update web page ", time_web.elapsed());
-        }
-        counter += 1;
         new_tick = false;
         //update the frontier if the robot has moved
         if robot_moved{
@@ -128,6 +91,7 @@ pub fn explorer_execute(jerry: &mut Jerry, world: &mut World, mission_index: usi
         .additional_data.as_ref()
         .unwrap().downcast_ref().unwrap();
         let spatial_index = data.spatial_index.clone();
+        println!("Exploring the sector {}", spatial_index);
 
         //if the frontier is empty, the robot should stop executing the mission
         //and execute the analyzer
@@ -140,22 +104,25 @@ pub fn explorer_execute(jerry: &mut Jerry, world: &mut World, mission_index: usi
             let (tl, br) = (data.top_left, data.bottom_right);
             let sector_data = analyzer_execute(world, tl, br);
             println!("Sector data: {:?}", sector_data);
+            //here we check if the sector is fully explored
+            if let None = sector_data.nodes.iter().find(|node|
+                 !jerry.road_tiles.contains(&ChartedCoordinate(node.0, node.1))){
+                    println!("Sector {} is fully explored", spatial_index);
+                return Ok(());
+            }
             generate_road_builders(jerry, world, sector_data);
             jerry.active_region.top_left = tl;
             jerry.active_region.bottom_right = br;
-            let map = robot_map(world).unwrap();
 
             return Ok(());
         }
 
-        //Debugging
-        //let time_choose = std::time::Instant::now();
-        //print!("Choosing tile ");
-
         let selected_tile = choose_frontier_tile(jerry, charted_paths, mission_index);
         //if the frontier is not accessible, the robot should stop executing the mission
         if selected_tile.is_err(){
+            println!("FRONTIER NOT ACCESSIBLE");
             let mut mission = jerry.missions.get_mut(mission_index);
+            let data: &ExplorerData = mission.as_ref().unwrap().additional_data.as_ref().unwrap().downcast_ref().unwrap();
             mission.as_mut().unwrap().status = Completed;
 
             let new_analyzer = new_sector_analyzer(spatial_index, jerry.world_dim);
@@ -164,18 +131,19 @@ pub fn explorer_execute(jerry: &mut Jerry, world: &mut World, mission_index: usi
             let (tl, br) = (data.top_left, data.bottom_right);
             let sector_data = analyzer_execute(world, tl, br);
             println!("Sector data: {:?}", sector_data);
+
+            //here we check if the sector is fully explored
+            if let None = sector_data.nodes.iter().find(|node|
+                !jerry.road_tiles.contains(&ChartedCoordinate(node.0, node.1))){
+                   println!("Sector {} is fully explored", spatial_index);
+               return Ok(());
+           }
             generate_road_builders(jerry, world, sector_data);
             jerry.active_region.top_left = tl;
             jerry.active_region.bottom_right = br;
-            
+
             return Ok(());
         }
-
-        //Debugging
-        //println!("took {:?} to choose tile ", time_choose.elapsed());
-        //let time_go = std::time::Instant::now();
-        //print!("Go to Tile ");
-
 
         //try to reach the selected tile or throw an error if the cost to get there is > 1000 or > than the robot has
         let selected_tile = selected_tile.unwrap().0;
@@ -243,9 +211,6 @@ pub fn explorer_execute(jerry: &mut Jerry, world: &mut World, mission_index: usi
         }
         else{
 
-            //Debugging
-            //println!("took {:?} to go to tile ", time_go.elapsed());
-
             robot_moved = true;
             continue;
         }
@@ -287,7 +252,7 @@ fn is_frontier(map: &Vec<Vec<Option<Tile>>>, coordinate: (usize, usize)) -> bool
     let cols = map[0].len();
     let row = coordinate.0;
     let col = coordinate.1;
-    if map[row][col].is_some(){
+    if map[row][col].is_some() && map[row][col].as_ref().unwrap().tile_type.properties().walk(){
         if (row > 0 && map[row - 1][col].is_none()) ||
             (row < rows - 1 && map[row + 1][col].is_none()) ||
             (col > 0 && map[row][col - 1].is_none()) ||
@@ -320,7 +285,7 @@ fn choose_frontier_tile(jerry: &mut Jerry, tool: ChartedPaths, mission_index: us
         let candidate = data.frontier[start..end].iter().rev()
         .filter(|coord| data.frontier_hs.contains(coord))
         .min_by_key(|coord|{
-            let cost = tool.shortest_path_cost(robot_charted_coord, **coord).unwrap_or(u32::MAX);
+            let cost = tool.shortest_path_cost_a_star(robot_charted_coord, **coord).unwrap_or(u32::MAX);
             if cost != u32::MAX{
                 frontier_accessible = true;
             }
@@ -334,8 +299,6 @@ fn choose_frontier_tile(jerry: &mut Jerry, tool: ChartedPaths, mission_index: us
     }
     return Err(FrontierNotAccessible);
 }
-//REFACTOR THIS!
-mod fast_paths;
 fn go_to_frontier(jerry: &mut Jerry, map: &Vec<Vec<Option<Tile>>>, 
                 world: &mut World, frontier_coordinate: ChartedCoordinate,
                 mission_index: usize)
@@ -365,7 +328,7 @@ fn go_to_frontier(jerry: &mut Jerry, map: &Vec<Vec<Option<Tile>>>,
     //can also try other values for n
     let n = 9;
     if is_within_n(jerry_coordinate, frontier_coordinate, n){
-        if let Ok(_) = fast_paths::go_to_coordinates
+        if let Ok(_) = go_to_coordinates
         (jerry, map, world, false, (frontier_coordinate.0, frontier_coordinate.1), n){
             remove_tile_from_frontier(jerry, frontier_coordinate, mission_index);
             return Ok(());
@@ -378,7 +341,6 @@ fn go_to_frontier(jerry: &mut Jerry, map: &Vec<Vec<Option<Tile>>>,
     //the errors are handled in the same way as in the function above
     if let Err(_) = TomTom::go_to_coordinates(jerry, world, false, (frontier_coordinate.0, frontier_coordinate.1)){
         if let Err(string) = TomTom::go_to_coordinates(jerry, world, true, (frontier_coordinate.0, frontier_coordinate.1)){
-            println!("Error: {:?} failed to go from {:?} to {:?}", string, jerry.get_coordinate(), frontier_coordinate);
             if string.eq("Not enough energy!"){
                 return Err(ExplorerError::NotEnoughEnergy);
             }
@@ -413,15 +375,17 @@ fn update_frontier(jerry: &mut Jerry, world: &mut World, map: &Vec<Vec<Option<Ti
             if (i, j) == (x, y){
                 continue;
             }
+
             let tile_coord = ChartedCoordinate(i, j);
             let spatial_index = calculate_spatial_index(i, j, map.len());
 
-            //check if there's a mission for the spatial index of the tile
+            //check if there's a mission for the spatial index of the tile that has the status New
+            //in this case we don't need to initialize a new mission
             let jerry_immut = jerry.borrow();
-            let _data: &ExplorerData = jerry_immut.missions.get(mission_index).unwrap().additional_data.as_ref().unwrap().downcast_ref().unwrap();
+            let data: &ExplorerData = jerry_immut.missions.get(mission_index).unwrap().additional_data.as_ref().unwrap().downcast_ref().unwrap();
             let mission_exists = jerry_immut.missions.iter().any(|mission| {
                 if let Some(explorer_data) = mission.additional_data.as_ref().unwrap().downcast_ref::<ExplorerData>(){
-                    explorer_data.spatial_index == spatial_index
+                    explorer_data.spatial_index == spatial_index && (mission.status == New || mission.status == Active)
                 }
                 else{
                     false
@@ -431,9 +395,22 @@ fn update_frontier(jerry: &mut Jerry, world: &mut World, map: &Vec<Vec<Option<Ti
 
             //if the tile is a frontier tile and it's not in the current mission's spatial index
             //so we need to initialize a new mission for the new spatial index
-            if !mission_exists{
+            //make sure that some tiles around the robot view are unknown to avoid exploring the same area twice
+
+            let mut new_sector_unknown = false;
+            for row in (i.saturating_sub(1))..=(i + 1).min(len - 1) {
+                for col in (j.saturating_sub(1))..=(j + 1).min(len - 1) {
+                    if map[row][col].is_none(){
+                        new_sector_unknown = true;
+                        break;
+                    }
+                }
+            }
+
+            if !mission_exists && new_sector_unknown{
                 let jerry_mut = jerry.clone();
                 let new_mission = new_explorer(&mut jerry_mut.borrow_mut(), world, spatial_index);
+                println!("New frontier {:?}", new_mission.additional_data.as_ref().unwrap().downcast_ref::<ExplorerData>().unwrap().frontier_hs);
                 jerry_mut.borrow_mut().missions.push_back(new_mission);
                 println!("New mission \"Explore\" for spatial index {}", spatial_index);
             }
@@ -443,7 +420,7 @@ fn update_frontier(jerry: &mut Jerry, world: &mut World, map: &Vec<Vec<Option<Ti
             
             //add a tile to the frontier if it's not already there
             if !data.frontier_hs.contains(&tile_coord) {
-                if is_frontier(map, (tile_coord.0, tile_coord.1)) && 
+                if is_frontier(map, (tile_coord.0, tile_coord.1)) &&
                 spatial_index == data.spatial_index{
                     data.frontier.push(tile_coord);
                     data.frontier_hs.insert(tile_coord);

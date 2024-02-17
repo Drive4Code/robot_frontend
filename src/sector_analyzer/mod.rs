@@ -19,9 +19,6 @@ pub fn new_sector_analyzer(spatial_index: usize, world_dim: usize) -> Mission {
     let (tl, br) = get_tl_and_br_from_spatial_index(spatial_index, world_dim);
     Mission {
         name: "Sector Analyzer".to_string(),
-        description: None,
-        probability_of_cheating: 0.0,
-        goal_tracker: None,
         status: Active,
         additional_data: Some(Box::new(ActiveRegion {
             top_left: tl,
@@ -45,13 +42,14 @@ pub fn analyzer_execute(world: &mut World, tl: (usize, usize), br: (usize, usize
     let sector_resources = sector_collectable(&sector_map);
     let mountain_tiles = count_mountain_tiles(&sector_map);
     let is_random = is_content_random(&sector_map);
-    let mut storage = find_largest_connected_subset(&sector_map);
+    let mut zone = find_largest_connected_subset(&sector_map);
     //turn the relative coordinates into absolute
-    for coord in storage.iter_mut(){
+    for coord in zone.iter_mut(){
         coord.0 += tl.0;
         coord.1 += tl.1;
     }
-    let nodes = vec![get_centroid(&storage)];
+    let mut nodes = vec![get_centroid(&zone)];
+    println!("{:?}", get_centroid(&zone));
     if is_random{
         return SectorData {
             resources: sector_resources,
@@ -65,7 +63,6 @@ pub fn analyzer_execute(world: &mut World, tl: (usize, usize), br: (usize, usize
     let model_inputs = map_into_db_input(&sector_map);
     let classification = model.run(&model_inputs);
     let mut clusters =  HashMap::new();
-    let mut nodes = Vec::new();
     for el in classification.iter(){
         if let Classification::Core((i, j), c) = el{
            if !clusters.contains_key(c){
@@ -76,11 +73,13 @@ pub fn analyzer_execute(world: &mut World, tl: (usize, usize), br: (usize, usize
            }
         }
     }
+    println!("Clusters len: {}", clusters.len());
     for (c, cores) in clusters.iter(){
         let mut centroid = get_centroid(cores);
         //turn the relative coordinates into absolute
         centroid.0 += tl.0;
         centroid.1 += tl.1;
+        println!("Centroid of the cluster is {:?}", centroid);
         nodes.push(centroid);
     }
     SectorData {
@@ -101,7 +100,7 @@ pub fn sector_collectable(sector: &Vec<Vec<Option<Tile>>>) -> HashMap<Content, u
                 if !content.properties().destroy(){
                     continue;
                 }  
-                let count = resources.entry(content.to_default().clone()).or_insert(0);
+                let mut count = resources.entry(content.to_default().clone()).or_insert(0);
                 match content.get_value(){
                     (Some(amount), None) => {
                         *count += amount;
@@ -206,3 +205,63 @@ fn get_centroid(cores: &Vec<(usize, usize)>) -> (usize, usize){
     (x/cores.len(), y/cores.len())
 }
 mod dbscan;
+
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+
+    #[test]
+    fn test_sector_collectable() {
+        let sector: Vec<Vec<Option<Tile>>> = vec![
+            vec![
+                Some(Tile{tile_type: Grass, content: Content::Rock(3), elevation: 0}),
+                Some(Tile{tile_type: Grass, content: Content::Rock(3), elevation: 0}),
+                Some(Tile{tile_type: Grass, content: Content::Rock(3), elevation: 0}),
+            ],
+            vec![
+                Some(Tile{tile_type: Grass, content: Content::Coin(3), elevation: 0}),
+                Some(Tile{tile_type: Grass, content: Content::Coin(3), elevation: 0}),
+                Some(Tile{tile_type: Grass, content: Content::Coin(3), elevation: 0}),
+            ],
+            vec![
+                Some(Tile{tile_type: Grass, content: Content::Bank(0..10), elevation: 0}),
+                Some(Tile{tile_type: Grass, content: Content::Fire, elevation: 0}),
+                Some(Tile{tile_type: Grass, content: Content::Crate(0..3), elevation: 0}),
+            ],
+
+        ];
+        let expected: HashMap<Content, usize> = {
+            let mut hm = HashMap::new();
+            hm.insert(Content::Rock(0), 3*3);
+            hm.insert(Content::Coin(0), 3*3);
+            hm.insert(Content::Fire, 1);
+            hm
+        };
+        assert_eq!(sector_collectable(&sector), expected);
+    }
+    #[test]
+    fn test_find_largest_connected_subset(){
+        let map: Vec<Vec<Option<Tile>>> = vec![
+            vec![
+                Some(Tile{tile_type: Grass, content: Content::None, elevation: 0}),
+                Some(Tile{tile_type: Sand, content: Content::None, elevation: 0}),
+                Some(Tile{tile_type: Sand, content: Content::None, elevation: 0}),
+            ],
+            vec![
+                Some(Tile{tile_type: Hill, content: Content::Crate(0..5), elevation: 0}),
+                Some(Tile{tile_type: Hill, content: Content::Tree(2), elevation: 0}),
+                Some(Tile{tile_type: Sand, content: Content::None, elevation: 0}),
+            ],
+            vec![
+                Some(Tile{tile_type: Sand, content: Content::None, elevation: 0}),
+                Some(Tile{tile_type: Grass, content: Content::None, elevation: 0}),
+                Some(Tile{tile_type: Sand, content: Content::None, elevation: 0}),
+            ],
+        ];
+        let subset = find_largest_connected_subset(&map);
+        println!("{:?}", subset);
+        assert_eq!(subset.len(), 3);
+    }
+}

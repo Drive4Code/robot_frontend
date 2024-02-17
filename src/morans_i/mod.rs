@@ -59,7 +59,6 @@ pub fn morans_i(sector: &Vec<Vec<Option<Tile>>>) -> f64{
 pub fn get_content_value_morans(tile: &Option<Tile>) -> f64{
     if tile.is_none(){
         return rand::thread_rng().gen_range(1..10) as f64;
-        //return 0.;
     }
     let content = tile.as_ref().unwrap().content.to_default();
     match content{
@@ -73,7 +72,6 @@ pub fn get_content_value_morans(tile: &Option<Tile>) -> f64{
         Content::Bush(_) => 8.,
         Content::JollyBlock(_) => 9.,
         _ => rand::thread_rng().gen_range(1..10) as f64,
-        //_ => 0.,
     }
 }
 pub fn get_w(n:usize) -> usize{
