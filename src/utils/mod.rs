@@ -62,6 +62,7 @@ pub enum JerryStatus{
     LowEnergyWarning,
     Common(LibError),
     ExpectingNiceWeather,
+    CallingNextTick,
 }
 pub fn execute_mission (jerry: &mut Jerry, world: &mut World){
 

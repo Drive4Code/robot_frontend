@@ -41,7 +41,7 @@ pub fn explorer_execute(jerry: &mut Jerry, world: &mut World, mission_index: usi
     let mut robot_moved = false;
     let mut counter = 0;
     let mut new_tick = true;
-    loop{
+    for _ in 0..1{
         //if the robot has less than 100 energy on the new tick, use the dynamo tool with the probability of 0.8
         if new_tick && jerry.get_energy().get_energy_level() < 100{
             let mut rng = rand::thread_rng();
@@ -208,6 +208,7 @@ pub fn explorer_execute(jerry: &mut Jerry, world: &mut World, mission_index: usi
             continue;
         }
     }
+    Err(JerryStatus::CallingNextTick)
 }
 //initialize the frontier when adding the new explorer mission
 pub fn initialize_frontier(jerry: &mut Jerry, world: &mut World) -> (Vec<ChartedCoordinate>, HashSet<ChartedCoordinate>){
