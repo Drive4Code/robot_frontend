@@ -52,7 +52,8 @@ impl Grid {
     }
 }
 
-const WORLD_DATA: &'static [u8] = include_bytes!("assets/world2.bin");
+// const WORLD_DATA: &'static [u8] = include_bytes!("assets/worldW.bin");
+const WORLD_DATA: &'static [u8] = include_bytes!("assets/nworld.bin");
 
 pub(crate) fn load_as_grid(grid: &mut Grid, _path: PathBuf) {
     // let msg = JsValue::from(format!("LOADER {:?}", WORLD_DATA));
@@ -160,7 +161,8 @@ impl robotics_lib::world::world_generator::Generator for WorldgeneratorUnwrap {
         }
         let mut loaded = match self.path.clone() {
             Some(path) => load(path),
-            None => load(PathBuf::new().join("world3.bin")),
+            // None => load(PathBuf::new().join("world3.bin")),
+            None => load(PathBuf::new().join("nworld.bin")),
         };
         loaded.4 = self.score_map.clone();
         loaded
