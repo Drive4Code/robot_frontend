@@ -254,7 +254,7 @@ pub fn road_builder_execute(jerry: &mut Jerry, world: &mut World, mission_index:
         If not enough material, try to collect it, come back and pave again
      */
     
-    loop{
+    for _ in 0..1{
         //if the robot has less than 100 energy on the new tick, use the dynamo tool with the probability of 0.8
         if new_tick && jerry.get_energy().get_energy_level() < 100{
             let mut rng = rand::thread_rng();
@@ -332,6 +332,7 @@ pub fn road_builder_execute(jerry: &mut Jerry, world: &mut World, mission_index:
             continue;
         }
     }
+    Err(JerryStatus::CallingNextTick)
 }
 fn go_and_pave(jerry: &mut Jerry, map: &Vec<Vec<Option<Tile>>>, world: &mut World, tile: ChartedCoordinate, mission_index: usize) -> Result<(), RoadBuilderError>{
     
