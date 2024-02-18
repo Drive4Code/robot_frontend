@@ -4,7 +4,7 @@ use ohcrab_weather::weather_tool::WeatherPredictionTool;
 // Project imports
 use robotics_lib::energy::Energy;
 use robotics_lib::event::events::Event;
-use robotics_lib::interface::{look_at_sky, robot_map};
+use robotics_lib::interface::{look_at_sky, robot_map, get_score};
 
 use robotics_lib::runner::backpack::BackPack;
 use robotics_lib::runner::{Robot, Runnable, Runner};
@@ -115,15 +115,13 @@ impl Default for EnergyState {
 
 #[derive(Clone, PartialEq, Atom)]
 pub(crate) struct ExtrasState {
-    pub(crate) is_dynamoing: bool,
-    pub(crate) tile_size: usize,
+    pub(crate) score: f32,
 }
 
 impl Default for ExtrasState {
     fn default() -> Self {
         Self {
-            is_dynamoing: false,
-            tile_size: 1,
+            score: 0.0,
         }
     }
 }
@@ -142,10 +140,11 @@ impl Default for StartingSettings {
             start_ai: false,
             tile_size: 40.0,
             follow_robot: true,
-            tick_time: 1,
+            tick_time: 0,
         }
     }
 }
+
 
 #[function_component(Main)]
 pub fn main() -> Html {
@@ -166,6 +165,7 @@ pub fn main() -> Html {
                         <br/>
                         <MapView/>
                         <Menu />
+                        // <ScoreDisplay />
                         <TimoAi />
                     </div>
                 }
@@ -193,7 +193,7 @@ pub fn main() -> Html {
 
                 html! {
                     <div id="start">
-                        <label for={"ticktime"}>{"Tick Time (ms)"}</label>
+                        <label for={"ticktime"}>{"Tick Delay (ms)"}</label>
                         <input id={"ticktime"} type={"text"} oninput={on_tick_time_input} value={settings.tick_time.to_string()}/>
                         <button onclick={start_game} >{"Start Game"}</button>
                     </div>
@@ -212,13 +212,21 @@ pub fn main() -> Html {
 #[function_component(Menu)]
 fn menu() -> Html {
     let settings = use_atom::<StartingSettings>();
-    let on_size_input = {
+
+    // Input Callbacks
+    let onchange_slider = {
         let settings = settings.clone();
 
-        Callback::from(move |e: InputEvent| {
+        Callback::from(move |e: yew::prelude::Event| {
             let input: HtmlInputElement = e.target_unchecked_into();
-
-            settings.set(StartingSettings { follow_robot: settings.follow_robot.clone(), start_ai: settings.start_ai.clone(), tile_size: input.value().parse::<f32>().expect("Expected f32 as tile size"), tick_time: settings.tick_time.clone() });
+            let value = input.value().parse::<f32>().unwrap_or(30.0);
+            log::info!("value = {}", &value);
+            settings.set(StartingSettings {
+                start_ai: settings.start_ai.clone(),
+                follow_robot: settings.follow_robot.clone(),
+                tile_size: value,
+                tick_time: settings.tick_time.clone(),
+            });
         })
     };
 
@@ -232,9 +240,8 @@ fn menu() -> Html {
 
     html! {
         <div id="menu">
-            <label for={"tilesize"}>{"Tile Size (px)"}</label>
-            <input id={"tilesize"} type={"text"} oninput={on_size_input} value={settings.tile_size.to_string()}/>
-            
+            <label for={"tilesize"}>{"Tile Size"}</label>
+            <input type="range" class="form-range" min="1" max="100" id="tilesize" onchange={onchange_slider.clone()} />
             <button type={"checkbox"} onclick={follow_bot_fn}>{"Toggle Freelook"}</button>
         </div>
     }
@@ -318,30 +325,6 @@ fn match_forecast(conditions: &WeatherType) -> String {
     }
 }
 
-// RING RING
-#[function_component(Zoom)]
-fn zoom() -> Html {
-    let extra_state = use_atom::<ExtrasState>();
-
-    let onchange_slider = {
-        Callback::from(move |e: yew::prelude::Event| {
-            let input: HtmlInputElement = e.target_unchecked_into();
-            let value = input.value().parse::<usize>().unwrap_or(4);
-            log::info!("value = {}", &value);
-            extra_state.set(ExtrasState {
-                is_dynamoing: extra_state.is_dynamoing.clone(),
-                tile_size: value,
-            });
-        })
-    };
-
-    html! {
-        <div class="slider">
-             <input type="range" class="form-range" min="1" max="10" id="my_broken_slider" onchange={onchange_slider.clone()} />
-            //   <label for="my_broken_slider" class="form-label">{&*value_label}</label>
-        </div>
-    }
-}
 
 #[function_component(MapView)]
 pub fn map_view() -> Html {
@@ -534,6 +517,18 @@ fn content_match_day(input: &Content) -> &'static str{
 
 }
 
+#[function_component(ScoreDisplay)]
+fn score_display() -> Html {
+    let extras = use_atom::<ExtrasState>();
+
+    html! {
+        <div id="score">
+            <h2>{"Score"}</h2>
+            <p>{&extras.score}</p>
+        </div>
+    }
+}
+
 // TIMO CODE
 pub(crate) struct Jerry {
     pub(crate) robot: Robot,
@@ -596,6 +591,11 @@ pub fn timo_ai() -> Html {
                         forecast: tmp_conditions.get_weather_condition(),
                         time: tmp_time,
                     });
+                }
+                let tmp_score = get_score(&world);
+                info!("{}", format!("SCORE {}", tmp_score.to_string()));
+                if tmp_score != self.extras.score {
+                    self.extras.set(ExtrasState {score: tmp_score});
                 }
                 // info!("CHANGED CONDITIONS");
             }

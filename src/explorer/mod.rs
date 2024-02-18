@@ -46,11 +46,11 @@ pub(crate) fn explorer_execute(jerry: &mut Jerry, world: &mut World, mission_ind
             let probability = rng.gen_range(0.0..1.0);
             if probability < 0.8{
                 *jerry.get_energy_mut() = Dynamo::update_energy();
-                jerry.extras.set(ExtrasState {is_dynamoing: true, tile_size: jerry.extras.tile_size.clone()});
+                // jerry.extras.set(ExtrasState {is_dynamoing: true, tile_size: jerry.extras.tile_size.clone()});
             } 
-            else {
-                jerry.extras.set(ExtrasState {is_dynamoing: false, tile_size: jerry.extras.tile_size.clone()});
-            }
+            // else {
+            //     jerry.extras.set(ExtrasState {is_dynamoing: false, tile_size: jerry.extras.tile_size.clone()});
+            // }
         }
 
         let map = robot_map(world).unwrap();
