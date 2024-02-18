@@ -272,7 +272,7 @@ pub struct BackItemProps {
 
 #[function_component(BackItem)]
 fn back_item(props: &BackItemProps) -> Html {
-    let img_display: String = content_match_day(&props.content);
+    let img_display: &str = content_match_day(&props.content);
     html! {
         <div class={classes!("back_item")}>
             <img  src={img_display}/>
@@ -467,7 +467,8 @@ pub fn map_tile(props: &MapTileProps) -> Html {
 #[function_component(MapTileContent)]
 pub fn map_tile_content(props: &MapTileProps) -> Html {
     let cond_state = use_atom::<EnviromentalState>();
-    let img_display: String;
+    let img_display: &str;
+
     let hour: u8 = cond_state.time[0..2]
         .to_owned()
         .parse::<u8>()
@@ -492,25 +493,45 @@ pub fn map_tile_content(props: &MapTileProps) -> Html {
     }
 }
 
-fn content_match_day(input: &Content) -> String {
-    match input {
-        Rock(_) =>return  "img/rock-min.png".to_string(),
-        Tree(_) =>return  "https://minecraft.wiki/images/thumb/Azalea_Tree.png/250px-Azalea_Tree.png?945ad".to_string(),
-        Garbage(_) => return "img/garbage-min.png".to_string(),
-        Fire => return "img/fire.webp".to_string(),
-        Coin(_) => return "img/coin-min.png".to_string(),
-        Bin(_) => return "img/bin-min.png".to_string(),
-        Crate(_) => return "https://gamepedia.cursecdn.com/minecraft_gamepedia/b/b3/Chest.png?version=227b3f51ef706a4ce4cf5e91f0e4face".to_string(),
-        Bank(_) =>return  "https://vignette.wikia.nocookie.net/pixelpeople/images/a/ae/Bank.png/revision/latest?cb=20130904201633".to_string(),
-        Water(_) => return "img/water-min.png".to_string(),
-        Market(_) => return "img/market-min.png".to_string(),
-        Fish(_) =>return  "https://gamepedia.cursecdn.com/minecraft_gamepedia/a/ad/Tropical_Fish_JE2_BE2.png".to_string(),
-        Building => return "https://gamepedia.cursecdn.com/minecraft_gamepedia/f/f5/Plains_Cartographer_1.png".to_string(),
-        Bush(_) => return "img/bush.webp".to_string(),
-        JollyBlock(_) => return "img/jolly-min.png".to_string(),
-        Scarecrow => return "img/scarecrow-min.png".to_string(),
-        Content::None => return "".to_string(),        
-}
+fn content_match_day(input: &Content) -> &'static str{
+    // Define constant image URLs
+    const ROCK_IMAGE: &str = "img/rock-min.png";
+    const TREE_IMAGE: &str = "https://minecraft.wiki/images/thumb/Azalea_Tree.png/250px-Azalea_Tree.png?945ad";
+    const GARBAGE_IMAGE: &str = "img/garbage-min.png";
+    const FIRE_IMAGE: &str = "img/fire.webp";
+    const COIN_IMAGE: &str = "img/coin-min.png";
+    const BIN_IMAGE: &str = "img/bin-min.png";
+    const CRATE_IMAGE: &str = "https://gamepedia.cursecdn.com/minecraft_gamepedia/b/b3/Chest.png?version=227b3f51ef706a4ce4cf5e91f0e4face";
+    const BANK_IMAGE: &str = "https://vignette.wikia.nocookie.net/pixelpeople/images/a/ae/Bank.png/revision/latest?cb=20130904201633";
+    const WATER_IMAGE: &str = "img/water-min.png";
+    const MARKET_IMAGE: &str = "img/market-min.png";
+    const FISH_IMAGE: &str = "https://gamepedia.cursecdn.com/minecraft_gamepedia/a/ad/Tropical_Fish_JE2_BE2.png";
+    const BUILDING_IMAGE: &str = "https://gamepedia.cursecdn.com/minecraft_gamepedia/f/f5/Plains_Cartographer_1.png";
+    const BUSH_IMAGE: &str = "img/bush.webp";
+    const JOLLY_BLOCK_IMAGE: &str = "img/jolly-min.png";
+    const SCARECROW_IMAGE: &str = "img/scarecrow-min.png";
+    const EMPTY_IMAGE: &str = "";
+
+        match input {
+            Content::Rock(_) => ROCK_IMAGE,
+            Content::Tree(_) => TREE_IMAGE,
+            Content::Garbage(_) => GARBAGE_IMAGE,
+            Content::Fire => FIRE_IMAGE,
+            Content::Coin(_) => COIN_IMAGE,
+            Content::Bin(_) => BIN_IMAGE,
+            Content::Crate(_) => CRATE_IMAGE,
+            Content::Bank(_) => BANK_IMAGE,
+            Content::Water(_) => WATER_IMAGE,
+            Content::Market(_) => MARKET_IMAGE,
+            Content::Fish(_) => FISH_IMAGE,
+            Content::Building => BUILDING_IMAGE,
+            Content::Bush(_) => BUSH_IMAGE,
+            Content::JollyBlock(_) => JOLLY_BLOCK_IMAGE,
+            Content::Scarecrow => SCARECROW_IMAGE,
+            Content::None => EMPTY_IMAGE,
+        }
+
+
 }
 
 // TIMO CODE
@@ -583,8 +604,7 @@ pub fn timo_ai() -> Html {
                 println!();
                 println!("{:?}", event);
                 // Logs the event to the console
-                let msg = JsValue::from(format!("{:?}", event));
-                // info!("[ EVENT ]{}", msg.as_string().unwrap());
+                // info!("[ EVENT ]{}", format!("{:?}", event));
                 // Backpack Updates
                 match event {
                     Event::AddedToBackpack(_, _) | Event::RemovedFromBackpack(_, _) => {
@@ -728,19 +748,18 @@ pub(crate) struct MyRobot {
 }
 
 async fn run_game(run: Rc<RefCell<Result<Runner, LibError>>>, settings: UseAtomHandle<StartingSettings>) -> () {
+    let tick_time = settings.tick_time.clone();
+    // let mut counter = 0;
     sleep(1000).await;
     for _ in 0..100000 {
-        sleep(settings.tick_time.clone()).await;
-        info!("[ RUNNER ] Tick {:?}", settings.tick_time.clone());
+        info!("[ RUNNER ] Tick {:?}", tick_time);
         // Get a mutable reference to the Result<Runner>
         let mut runner_result = run.borrow_mut();
         // Handle the Result using map and map_err
         runner_result
             .as_mut()
             .map(|runner| {
-                // runner is now a mutable reference to the Runner
                 let _ = runner.game_tick();
-                let _robot_coordinate = runner.get_robot().get_coordinate();
             })
             .map_err(|e| {
                 info!("[ RUNNER ] ERROR WITH RUN: {:?}", e);
@@ -748,6 +767,9 @@ async fn run_game(run: Rc<RefCell<Result<Runner, LibError>>>, settings: UseAtomH
             .unwrap_or_else(|_| {
                 info!("[ RUNNER ] ERROR WITH RUN. ");
             });
+        sleep(tick_time).await;
+        
+        // counter = counter +1;
     }
 }
 
