@@ -14,7 +14,7 @@ pub mod road_builder;
 pub mod resources;
 pub mod fast_paths;
 
-use interface::{Main, TimoAi, StartingSettings};
+use interface::{Main};
 
 #[function_component(App)]
 fn app() -> Html {
@@ -23,10 +23,7 @@ fn app() -> Html {
     html! {
         <>
         <BounceRoot>
-            // <h1>{ "Robot" }</h1>
             <Main/>
-            // This next line chooses which AI to start
-            // <TimoAi />
         </BounceRoot>
         
         </>

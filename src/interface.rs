@@ -37,9 +37,9 @@ use log::info;
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
-use wasm_bindgen::JsValue;
+use wasm_bindgen::{JsCast, JsValue};
 use wasm_bindgen_futures::JsFuture;
-use web_sys::{window, HtmlInputElement};
+use web_sys::{window, HtmlElement, HtmlInputElement, Element};
 use yew::prelude::*;
 use yew::{function_component, html, Html, Properties};
 
@@ -131,16 +131,18 @@ impl Default for ExtrasState {
 #[derive(Clone, PartialEq, Atom)]
 pub(crate) struct StartingSettings {
     start_ai: bool,
-    tile_size: usize,
-    tick_time: usize,
+    tile_size: f32,
+    follow_robot: bool,
+    tick_time: u32,
 }
 
 impl Default for StartingSettings {
     fn default() -> Self {
         Self {
             start_ai: false,
-            tile_size: 5,
-            tick_time: 100,
+            tile_size: 40.0,
+            follow_robot: true,
+            tick_time: 1,
         }
     }
 }
@@ -148,8 +150,7 @@ impl Default for StartingSettings {
 #[function_component(Main)]
 pub fn main() -> Html {
     let settings = use_atom::<StartingSettings>();
-    let msg = JsValue::from(format!("Rendered Main"));
-    info!("{}", msg.as_string().unwrap());
+    info!("Rendered Main");
 
     html! {
         html! {
@@ -164,44 +165,37 @@ pub fn main() -> Html {
                         // <Zoom />
                         <br/>
                         <MapView/>
+                        <Menu />
                         <TimoAi />
                     </div>
                 }
             } else {
-                // Game menu
-                // let on_tick_input = {
-                //     let settings = settings.clone();
 
-                //     Callback::from(move |e: InputEvent| {
-                //         let input: HtmlInputElement = e.target_unchecked_into();
-
-                //         settings.set(StartingSettings { tick_time: input.value().parse::<usize>().expect("Expected usize as tick time"), start_ai: settings.start_ai.clone(), tile_size: settings.tile_size.clone() });
-                //     })
-                // };
-
-                // let on_size_input = {
-                //     let settings = settings.clone();
-
-                //     Callback::from(move |e: InputEvent| {
-                //         let input: HtmlInputElement = e.target_unchecked_into();
-
-                //         settings.set(StartingSettings { tick_time: settings.tick_time.clone(), start_ai: settings.start_ai.clone(), tile_size: input.value().parse::<usize>().expect("Expected usize as tick time") });
-                //     })
-                // };
+                let on_tick_time_input = {
+                    let settings = settings.clone();
+            
+                    Callback::from(move |e: InputEvent| {
+                        let input: HtmlInputElement = e.target_unchecked_into();
+            
+                        settings.set(StartingSettings { follow_robot: settings.follow_robot.clone(), start_ai: settings.start_ai.clone(), tile_size: settings.tile_size.clone(), tick_time: input.value().parse::<u32>().expect("Expected u32 as tick time") });
+                    })
+                };
 
                 // Start the game on button click
                 let start_game = {
                     let settings = settings.clone();
 
                     Callback::from(move |_| {
-                        settings.set(StartingSettings { tick_time: settings.tick_time.clone(), start_ai: true, tile_size: settings.tile_size.clone() });
+                        settings.set(StartingSettings { follow_robot: settings.follow_robot.clone(), start_ai: true, tile_size: settings.tile_size.clone(), tick_time: settings.tick_time.clone() });
                     })
                 };
 
 
                 html! {
-                    <div id="info">
-                        <button onclick={start_game} id={"start_button"}>{"Start Game"}</button>
+                    <div id="start">
+                        <label for={"ticktime"}>{"Tick Time (ms)"}</label>
+                        <input id={"ticktime"} type={"text"} oninput={on_tick_time_input} value={settings.tick_time.to_string()}/>
+                        <button onclick={start_game} >{"Start Game"}</button>
                     </div>
                 }
             }
@@ -214,6 +208,39 @@ pub fn main() -> Html {
     }
 }
 
+
+#[function_component(Menu)]
+fn menu() -> Html {
+    let settings = use_atom::<StartingSettings>();
+    let on_size_input = {
+        let settings = settings.clone();
+
+        Callback::from(move |e: InputEvent| {
+            let input: HtmlInputElement = e.target_unchecked_into();
+
+            settings.set(StartingSettings { follow_robot: settings.follow_robot.clone(), start_ai: settings.start_ai.clone(), tile_size: input.value().parse::<f32>().expect("Expected f32 as tile size"), tick_time: settings.tick_time.clone() });
+        })
+    };
+
+    let follow_bot_fn = {
+        let settings = settings.clone();
+
+        Callback::from(move |_| {
+            settings.set(StartingSettings { follow_robot: !settings.follow_robot.clone(), start_ai: true, tile_size: settings.tile_size.clone(), tick_time: settings.tick_time.clone() });
+        })
+    };
+
+    html! {
+        <div id="menu">
+            <label for={"tilesize"}>{"Tile Size (px)"}</label>
+            <input id={"tilesize"} type={"text"} oninput={on_size_input} value={settings.tile_size.to_string()}/>
+            
+            <button type={"checkbox"} onclick={follow_bot_fn}>{"Toggle Freelook"}</button>
+        </div>
+    }
+
+}
+
 #[function_component(BackP)]
 pub fn backpack() -> Html {
     let back_state = use_atom::<BackpackState>();
@@ -223,7 +250,7 @@ pub fn backpack() -> Html {
             <hr/>
             {"Size: "}{ &back_state.size}
             <br/>
-            {"Contents: "} //{ format!("{:?}", &back_state.content)}
+            {"Contents: "}
             { for back_state.content.iter().map(|content| {
                 match content.1 {
                     0 => html! {<></>},
@@ -274,8 +301,9 @@ fn enviroment_display() -> Html {
 
     html! {
         <div id="enviroment">
+        <h3>{format!("{}", &enviroment_state.time)}</h3>
             <img src={forecast_image} />
-            <h3>{format!("{}", &enviroment_state.time)}</h3>
+            
         </div>
     }
 }
@@ -323,6 +351,25 @@ pub fn map_view() -> Html {
     // let extra_state = use_atom::<ExtrasState>();
     let world_styles = format!("width: {}px; height: {}px; background-color: var(--background-color);", settings.tile_size.clone().to_string(), settings.tile_size.clone().to_string());
 
+    use_effect(move || {
+        if settings.follow_robot.clone() == true {
+        if let Some(window) = web_sys::window() {
+            if let Some(document) = window.document() {
+                if let Some(robot_element) = document.get_element_by_id("robot") {
+                    // As HtmlElement for scroll_into_view
+                    let robot_html_element = robot_element.dyn_into::<Element>().unwrap();
+                    // let rect = robot_html_element.get_bounding_client_rect();
+                    robot_html_element.scroll_into_view();
+                    // window.scroll_by_with_x_and_y(0.0, -500.0);
+                    // .scroll_into_view_with_bool(true);
+                }
+            }
+        }
+    }
+
+        || ()
+    });
+        
     html! {
         <div id={"robot_view"}>
             {for world_state.world.clone().iter().enumerate().map(|(i, row)| {
@@ -331,7 +378,7 @@ pub fn map_view() -> Html {
                         { for row.iter().enumerate().map(|(j, tile_option)| {
                             match tile_option {
                                 Some(tile) => html! {
-                                    <div class={"tile"}>
+                                    <div class={"tile"} style={world_styles.clone()}>
                                     <MapTile tile={tile.clone()}/>
                                     {if i == robot_state.coord.0.clone() && j == robot_state.coord.1.clone() {
                                                     html! {<img id={"robot"} src={"https://icons.iconarchive.com/icons/google/noto-emoji-smileys/1024/10103-robot-face-icon.png"} />}
@@ -361,11 +408,15 @@ pub struct MapTileProps {
 #[function_component(MapTile)]
 pub fn map_tile(props: &MapTileProps) -> Html {
     let cond_state = use_atom::<EnviromentalState>();
+    let settings = use_atom::<StartingSettings>();
+    // let extra_state = use_atom::<ExtrasState>();
+    let world_styles = format!("width: {}px; height: {}px; background-color: var(--background-color);", settings.tile_size.clone().to_string(), settings.tile_size.clone().to_string());
+    let world_style = &world_styles[..];
     let hour: u8 = cond_state.time[0..2]
         .to_owned()
         .parse::<u8>()
-        .expect("Bought the flight to Cali racks & condoms in my suitcase");
-    let tile_style: &str;
+        .expect("Expected hour");
+    let tile_style: String;
     let daytime: bool;
     match hour {
         19..=23 | 00..=05 => {
@@ -377,30 +428,30 @@ pub fn map_tile(props: &MapTileProps) -> Html {
     }
     match daytime {
         true => match props.tile.tile_type {
-            TileType::Wall => tile_style = "background-color: rgb(125, 125, 125);",
-            DeepWater => tile_style = "background-color: #2B00FF;",
-            ShallowWater => tile_style = "background-color: #00B3FF;",
-            Sand => tile_style = "background-color: #FFC400;",
-            Grass => tile_style = "background-color: #23B606;",
-            Street => tile_style = "background-color: #000000;",
-            Hill => tile_style = "background-color: #FFBD4A;",
-            Mountain => tile_style = "background-color: #8C8CF9;",
-            Snow => tile_style = "background-color: #F5F5F5;",
-            Lava => tile_style = "background-color: #F2DA3E;",
-            Teleport(_) => tile_style = "background-color: #BC1FEC;",
+            TileType::Wall => tile_style = format!("{} background-color: rgb(125, 125, 125);", world_style),
+            DeepWater => tile_style = format!("{} background-color: #2B00FF;", world_style),
+            ShallowWater => tile_style = format!("{} background-color: #00B3FF;", world_style),
+            Sand => tile_style = format!("{} background-color: #FFC400;", world_style),
+            Grass => tile_style = format!("{} background-color: #23B606;", world_style),
+            Street => tile_style = format!("{} background-color: #000000;", world_style),
+            Hill => tile_style = format!("{} background-color: #FFBD4A;", world_style),
+            Mountain => tile_style = format!("{} background-color: #8C8CF9;", world_style),
+            Snow => tile_style = format!("{} background-color: #F5F5F5;", world_style),
+            Lava => tile_style = format!("{} background-color: #F2DA3E;", world_style),
+            Teleport(_) => tile_style = format!("{} background-color: #BC1FEC;", world_style),
         },
         false => match props.tile.tile_type {
-            TileType::Wall => tile_style = "background-color: rgb(125, 125, 125);",
-            DeepWater => tile_style = "background-color: #030C58;",
-            ShallowWater => tile_style = "background-color: #074A84;",
-            Sand => tile_style = "background-color: #A5931B;",
-            Grass => tile_style = "background-color: #0E5411;",
-            Street => tile_style = "background-color: #000000;",
-            Hill => tile_style = "background-color: #573708;",
-            Mountain => tile_style = "background-color: #20314A;",
-            Snow => tile_style = "background-color: #C9C9C9;",
-            Lava => tile_style = "background-color: #F2DA3E;",
-            Teleport(_) => tile_style = "background-color: #56038D;",
+            TileType::Wall => tile_style = format!("{} background-color: rgb(125, 125, 125);", world_style),
+            DeepWater => tile_style = format!("{} background-color: #030C58;", world_style),
+            ShallowWater => tile_style = format!("{} background-color: #074A84;", world_style),
+            Sand => tile_style = format!("{} background-color: #A5931B;", world_style),
+            Grass => tile_style = format!("{} background-color: #0E5411;", world_style),
+            Street => tile_style = format!("{} background-color: #000000;", world_style),
+            Hill => tile_style = format!("{} background-color: #573708;", world_style),
+            Mountain => tile_style = format!("{} background-color: #20314A;", world_style),
+            Snow => tile_style = format!("{} background-color: #C9C9C9;", world_style),
+            Lava => tile_style = format!("{} background-color: #F2DA3E;", world_style),
+            Teleport(_) => tile_style = format!("{} background-color: #56038D;", world_style),
         },
     }
 
@@ -445,8 +496,8 @@ fn content_match_day(input: &Content) -> String {
     match input {
         Rock(_) =>return  "img/rock-min.png".to_string(),
         Tree(_) =>return  "https://minecraft.wiki/images/thumb/Azalea_Tree.png/250px-Azalea_Tree.png?945ad".to_string(),
-        Garbage(_) => return "img/gargabe-min.png".to_string(),
-        Fire => return "https://www.startpage.com/av/proxy-image?piurl=https%3A%2F%2Fstatic.wikia.nocookie.net%2Fminecraft_gamepedia%2Fimages%2Fa%2Fa5%2FFire.gif%2Frevision%2Flatest%2Fscale-to-width-down%2F1200%3Fcb%3D20200206093505&sp=1708200587T4b29c809aaa089e6e41796bb1654be54492d4141acc2b6ed46233b7f84dcba08".to_string(),
+        Garbage(_) => return "img/garbage-min.png".to_string(),
+        Fire => return "img/fire.webp".to_string(),
         Coin(_) => return "img/coin-min.png".to_string(),
         Bin(_) => return "img/bin-min.png".to_string(),
         Crate(_) => return "https://gamepedia.cursecdn.com/minecraft_gamepedia/b/b3/Chest.png?version=227b3f51ef706a4ce4cf5e91f0e4face".to_string(),
@@ -455,7 +506,7 @@ fn content_match_day(input: &Content) -> String {
         Market(_) => return "img/market-min.png".to_string(),
         Fish(_) =>return  "https://gamepedia.cursecdn.com/minecraft_gamepedia/a/ad/Tropical_Fish_JE2_BE2.png".to_string(),
         Building => return "https://gamepedia.cursecdn.com/minecraft_gamepedia/f/f5/Plains_Cartographer_1.png".to_string(),
-        Bush(_) => return "https://www.startpage.com/av/proxy-image?piurl=https%3A%2F%2Fstatic.wikia.nocookie.net%2Fpixel-planet%2Fimages%2Fa%2Fa1%2FBush.png%2Frevision%2Flatest%3Fcb%3D20200528081132&sp=1708201176Ta3ba33f3e79d4e9c805b06521401e7896da96d931f45e848b970bd4cb576a5d6".to_string(),
+        Bush(_) => return "img/bush.webp".to_string(),
         JollyBlock(_) => return "img/jolly-min.png".to_string(),
         Scarecrow => return "img/scarecrow-min.png".to_string(),
         Content::None => return "".to_string(),        
@@ -492,6 +543,7 @@ pub fn timo_ai() -> Html {
     let env_state = use_atom::<EnviromentalState>();
     let energy_state = use_atom::<EnergyState>();
     let extra_state = use_atom::<ExtrasState>();
+    let settings = use_atom::<StartingSettings>();
 
     let msg = JsValue::from(format!("Ai Running"));
     info!("{}", msg.as_string().unwrap());
@@ -656,7 +708,7 @@ pub fn timo_ai() -> Html {
         if world_state.counter == 0 {
             info!("STARTING GAME...");
             wasm_bindgen_futures::spawn_local(async move {
-                let _done = run_game(run).await;
+                let _done = run_game(run, settings.clone()).await;
             });
         }
     }
@@ -675,11 +727,11 @@ pub(crate) struct MyRobot {
     pub(crate) en: UseAtomHandle<EnergyState>,
 }
 
-async fn run_game(run: Rc<RefCell<Result<Runner, LibError>>>) -> () {
+async fn run_game(run: Rc<RefCell<Result<Runner, LibError>>>, settings: UseAtomHandle<StartingSettings>) -> () {
     sleep(1000).await;
-    for _ in 0..10000 {
-        sleep(1).await;
-        info!("[ RUNNER ] Tick");
+    for _ in 0..100000 {
+        sleep(settings.tick_time.clone()).await;
+        info!("[ RUNNER ] Tick {:?}", settings.tick_time.clone());
         // Get a mutable reference to the Result<Runner>
         let mut runner_result = run.borrow_mut();
         // Handle the Result using map and map_err

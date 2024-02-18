@@ -10,21 +10,7 @@
         <main id="app"></main>
         <script type="module">
             import init, { run_app, load_as_grid_from_js } from './pkg/frontend_wasm.js';
-            init('/pkg/frontend_wasm_bg.wasm').then(run_app);
-    
-            async function run() {
-                await init('/pkg/frontend_wasm_bg.wasm'); // Initialize your WASM module
-    
-                // Assuming you know the exact path and it's accessible via HTTP request
-                // For local files, you'd need the user to select the file or drag and drop
-                const response = await fetch('/path/to/your/file.bin');
-                const bytes = await response.arrayBuffer();
-    
-                load_as_grid_from_js(new Uint8Array(bytes));
-                run_app
-            }
-    
-            run().catch(console.error);
+            init().then(run_app);
         </script>
     </body>
 </html>
