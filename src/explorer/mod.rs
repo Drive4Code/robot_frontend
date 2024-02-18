@@ -36,13 +36,11 @@ pub fn new_explorer(jerry: &mut Jerry, world: &mut World, spatial_index: usize) 
     Mission{
         name: "Explore".to_string(),
         status: New,
-        additional_data: Some(Box::new(ExplorerData{frontier, frontier_hs, spatial_index})),
+        additional_data: Some(Box::new(ExplorerData{frontier, frontier_hs, spatial_index, robot_moved: false})),
     }
 }
 pub fn explorer_execute(jerry: &mut Jerry, world: &mut World, mission_index: usize) -> Result<(), JerryStatus>{
     //initialize the frontier in the beginning of the simulation
-    let mut robot_moved = false;
-    let mut counter = 0;
     let mut new_tick = true;
     for _ in 0..1{
         //if the robot has less than 100 energy on the new tick, use the dynamo tool with the probability of 0.8
@@ -76,13 +74,18 @@ pub fn explorer_execute(jerry: &mut Jerry, world: &mut World, mission_index: usi
             }
         }
 
-        new_tick = false;
+        let mut mission = jerry.missions.get_mut(mission_index);
+        let data: &mut ExplorerData = mission.as_mut().unwrap()
+        .additional_data.as_mut()
+        .unwrap().downcast_mut().unwrap();
+        let robot_moved = data.robot_moved;
+        data.robot_moved = false;
         //update the frontier if the robot has moved
         if robot_moved{
-            //Debugging
-            //println!("Updating frontier");
             update_frontier(jerry, world, &map, ChartedCoordinate(position.0, position.1), mission_index);
         }
+
+        new_tick = false;
         let mut charted_paths  = ChartingTools::tool::<ChartedPaths>()
             .expect("too many tools used!");
         charted_paths.init(&map, world);
@@ -197,7 +200,9 @@ pub fn explorer_execute(jerry: &mut Jerry, world: &mut World, mission_index: usi
             match error{
                 //if the go interface failed (tool error), try to move to a tile next to the current one
                 | FailedToGo => {
-                     robot_moved = true;
+                    let mut mission = jerry.missions.get_mut(mission_index);
+                    let data: &mut ExplorerData = mission.as_mut().unwrap().additional_data.as_mut().unwrap().downcast_mut().unwrap();
+                    data.robot_moved = true;
                     continue;
                 }
                 //if not enough energy, stop executing the mission and wait to recharge
@@ -210,8 +215,9 @@ pub fn explorer_execute(jerry: &mut Jerry, world: &mut World, mission_index: usi
             return Err(JerryStatus::MissionExecutionError);
         }
         else{
-
-            robot_moved = true;
+            let mut mission = jerry.missions.get_mut(mission_index);
+            let data: &mut ExplorerData = mission.as_mut().unwrap().additional_data.as_mut().unwrap().downcast_mut().unwrap();
+            data.robot_moved = true;
             continue;
         }
     }
@@ -489,6 +495,7 @@ pub struct ExplorerData{
     pub frontier: Vec<ChartedCoordinate>,
     pub frontier_hs: HashSet<ChartedCoordinate>,
     pub spatial_index: usize,
+    pub robot_moved: bool,
 }
 #[derive(Debug)]
 pub enum ExplorerError{

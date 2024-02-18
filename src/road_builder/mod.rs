@@ -510,6 +510,7 @@ fn bessie_controller(jerry: &mut Jerry, map: &Vec<Vec<Option<Tile>>>, world: &mu
                                     if let Err(error) = vent_tool2.borrow_mut().vent_waypoint(jerry, world, 1000){
                                         match error{
                                             | vent_tool_ascii_crab::VentError::NotEnoughEnergy => return Err(RoadBuilderError::NotEnoughEnergy),
+                                            | vent_tool_ascii_crab::VentError::CommonCrateError(_) => return Err(RoadBuilderError::NotEnoughEnergy),
                                             | _ => panic!("{:?}", error),
                                         }
                                     }
