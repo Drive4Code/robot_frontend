@@ -347,8 +347,6 @@ pub fn map_view() -> Html {
     let settings = use_atom::<StartingSettings>();
     let cond_state = use_atom::<EnviromentalState>();
     
-    // Simplified time parsing and world style calculation
-    let hour: u8 = cond_state.time.get(..2).and_then(|s| s.parse().ok()).unwrap_or(12);
     let world_styles: String;
 
     let hour: u8 = if cond_state.time.len() >= 2 {
@@ -774,16 +772,6 @@ pub fn timo_ai() -> Html {
     html! {
         <></>
     }
-}
-
-//NICO CODE
-pub(crate) struct MyRobot {
-    pub(crate) robot: Robot,
-    pub(crate) bps: UseAtomHandle<BackpackState>,
-    pub(crate) ws: UseAtomHandle<WorldState>,
-    pub(crate) rs: UseAtomHandle<RobotState>,
-    pub(crate) env: UseAtomHandle<EnviromentalState>,
-    pub(crate) en: UseAtomHandle<EnergyState>,
 }
 
 async fn run_game(
