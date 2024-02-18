@@ -561,8 +561,7 @@ pub fn timo_ai() -> Html {
     let extra_state = use_atom::<ExtrasState>();
     let settings = use_atom::<StartingSettings>();
 
-    let msg = JsValue::from(format!("Ai Running"));
-    info!("{}", msg.as_string().unwrap());
+    info!("Ai Running");
     // let runner_ref = use_state_eq(|| None); timeout_jerry
     {
         impl Runnable for Jerry {
@@ -592,11 +591,11 @@ pub fn timo_ai() -> Html {
                         time: tmp_time,
                     });
                 }
-                let tmp_score = get_score(&world);
-                info!("{}", format!("SCORE {}", tmp_score.to_string()));
-                if tmp_score != self.extras.score {
-                    self.extras.set(ExtrasState {score: tmp_score});
-                }
+                // let tmp_score = get_score(&world);
+                // info!("{}", format!("SCORE {}", tmp_score.to_string()));
+                // if tmp_score != self.extras.score {
+                //     self.extras.set(ExtrasState {score: tmp_score});
+                // }
                 // info!("CHANGED CONDITIONS");
             }
 
