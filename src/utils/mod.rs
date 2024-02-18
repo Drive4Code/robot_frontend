@@ -1,39 +1,30 @@
 use std::any::Any;
-use std::cell::RefCell;
-use std::collections::HashSet;
-use std::hash::{Hash, Hasher};
-use std::ops::Add;
-use std::rc::Rc;
-use bob_lib::tracker::{Goal, GoalTracker};
-use charting_tools::charted_coordinate::ChartedCoordinate;
-use robotics_lib::interface::{robot_map, Direction};
-use robotics_lib::runner::Runnable;
+use std::hash::Hash;
+use robotics_lib::interface::Direction;
 use robotics_lib::utils::LibError;
-use robotics_lib::world::coordinates::Coordinate;
-use robotics_lib::world::tile::{Tile, Content, TileType};
+use robotics_lib::world::tile::Tile;
 use robotics_lib::world::World;
-use crate::explorer::{explorer_execute, ExplorerData};
+use crate::explorer::explorer_execute;
 use crate::interface::Jerry;
 use crate::road_builder::road_builder_execute;
-use crate::sector_analyzer::{analyzer_execute, SectorData};
 
 //use crate::road_builder::{build_road, road_builder_execute};
 
-pub const SECTOR_DIMENSION: usize = 70;
-pub struct Mission {
-    pub name: String,
-    pub status: MissionStatus,
-    pub additional_data: Option<Box<dyn Any>>,
+pub(crate) const SECTOR_DIMENSION: usize = 70;
+pub(crate) struct Mission {
+    pub(crate) name: String,
+    pub(crate) status: MissionStatus,
+    pub(crate) additional_data: Option<Box<dyn Any>>,
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum MissionStatus{
+pub(crate) enum MissionStatus{
     New,
     Active,
     Paused,
     Completed,
 }
 #[derive(Debug)]
-pub struct ActiveRegion{
+pub(crate) struct ActiveRegion{
     pub(crate) top_left: (usize, usize),
     pub(crate) bottom_right: (usize, usize),
     /*
@@ -57,14 +48,14 @@ pub struct ActiveRegion{
 }
 
 #[derive(Debug)]
-pub enum JerryStatus{
+pub(crate) enum JerryStatus{
     MissionExecutionError,
     LowEnergyWarning,
     Common(LibError),
     ExpectingNiceWeather,
     CallingNextTick,
 }
-pub fn execute_mission (jerry: &mut Jerry, world: &mut World){
+pub(crate) fn execute_mission (jerry: &mut Jerry, world: &mut World){
 
     //after every 2 completed explorers, need to build the roads
     //so if the # of completed explorers is even, set other active explorers to pause and continue with the road builders
@@ -145,11 +136,11 @@ pub fn execute_mission (jerry: &mut Jerry, world: &mut World){
         }
     }
 }
-pub fn get_world_dimension(world: &mut World) -> usize{
+pub(crate) fn get_world_dimension(world: &mut World) -> usize{
     println!("{:?}", world.get_discoverable());
     ((world.get_discoverable() as f64 / 3.0 - 1.0) * 10.0).sqrt() as usize
 }
-pub fn calculate_spatial_index(row: usize, col: usize, size: usize) -> usize {
+pub(crate) fn calculate_spatial_index(row: usize, col: usize, size: usize) -> usize {
     let num_cols_per_section = SECTOR_DIMENSION;
     let num_rows_per_section = SECTOR_DIMENSION;
     let num_sections_cols = (size as f64 / num_cols_per_section as f64).ceil() as usize;
@@ -158,7 +149,7 @@ pub fn calculate_spatial_index(row: usize, col: usize, size: usize) -> usize {
     let section_index = section_index_row * num_sections_cols + section_index_col;
     section_index
 }
-pub fn get_tl_and_br_from_spatial_index(spatial_index: usize, size: usize) -> ((usize, usize), (usize, usize)){
+pub(crate) fn get_tl_and_br_from_spatial_index(spatial_index: usize, size: usize) -> ((usize, usize), (usize, usize)){
 
     if size < SECTOR_DIMENSION {
         return ((0, 0), (size - 1, size - 1));
@@ -187,7 +178,7 @@ pub fn get_tl_and_br_from_spatial_index(spatial_index: usize, size: usize) -> ((
     (top_left, bottom_right)
 }
 //returns a slice of the robot map with the top left and bottom right corners defined by the coordinates
-pub fn robot_map_slice
+pub(crate) fn robot_map_slice
     (robot_map: &Vec<Vec<Option<Tile>>>,top_left: (usize, usize), bottom_right: (usize, usize))
      -> Option<Vec<Vec<Option<Tile>>>>{
     let mut map = Vec::new();
@@ -200,7 +191,7 @@ pub fn robot_map_slice
     }
     Some(map)
 }
-pub fn get_direction(from: (usize, usize), to: (usize, usize)) -> Option<Direction>{
+pub(crate) fn get_direction(from: (usize, usize), to: (usize, usize)) -> Option<Direction>{
     let (from_i, from_j) = from;
     let (to_i, to_j) = to;
     if from_i == to_i{

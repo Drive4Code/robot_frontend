@@ -1,24 +1,22 @@
 use core::panic;
 use std::collections::HashSet;
-use std::hash::Hash;
 use bessie::bessie::{road_paving_machine, RpmError, State};
-use charting_tools::charted_map::MapKey;
 use rand::Rng;
-use robotics_lib::interface::{destroy, go, put, robot_map, teleport, where_am_i, Direction};
+use robotics_lib::interface::{destroy, put, robot_map,  Direction};
 use robotics_lib::runner::Runnable;
-use robotics_lib::utils::{go_allowed, LibError};
+use robotics_lib::utils::LibError;
 use robotics_lib::world::tile::{Content, Tile, TileType};
 use robotics_lib::world::World;
-use rust_and_furious_dynamo::dynamo::{self, Dynamo};
-use rust_eze_tomtom::{path, TomTom};
+use rust_and_furious_dynamo::dynamo::Dynamo;
+use rust_eze_tomtom::TomTom;
 use crate::explorer::{coordinate_to_direction, is_adjacent};
 use crate::fast_paths::{dijkstra, path_to_coordinates};
-use crate::resources::{self, empty_the_backpack, get_content, ResourceCollectorError};
+use crate::resources::{empty_the_backpack, get_content, ResourceCollectorError};
 use crate::interface::Jerry;
 use crate::sector_analyzer::SectorData;
-use crate::utils::{get_direction, JerryStatus};
+use crate::utils::JerryStatus;
 use charting_tools::charted_coordinate::ChartedCoordinate;
-use charting_tools::charted_paths::{ChartedPaths};
+use charting_tools::charted_paths::ChartedPaths;
 use charting_tools::ChartingTools;
 use crate::utils::Mission;
 use crate::utils::MissionStatus::Paused;
@@ -27,7 +25,7 @@ use crate::utils::MissionStatus::Completed;
 use crate::road_builder::RoadBuilderError::RoadNonAccessible;
 
 const TO_REMOVE_FROM_BP: usize = 7;
-pub fn plan_node_2_node(jerry: &mut Jerry, world: &mut World, node1: (usize, usize), node2: (usize, usize)) -> Vec<ChartedCoordinate> {
+pub(crate) fn plan_node_2_node(jerry: &mut Jerry, world: &mut World, node1: (usize, usize), node2: (usize, usize)) -> Vec<ChartedCoordinate> {
     let target = HashSet::from([node2]);
     let road = HashSet::from([ChartedCoordinate(node2.0, node2.1)]);
     let map = robot_map(world).unwrap();
@@ -40,7 +38,7 @@ pub fn plan_node_2_node(jerry: &mut Jerry, world: &mut World, node1: (usize, usi
     println!("Failed to plan node to node");
     Vec::new()
 }
-pub fn plan_node_2_road(jerry: &mut Jerry, world: &mut World, node1: (usize, usize), local_road: Option<&HashSet<ChartedCoordinate>>) -> Vec<ChartedCoordinate> {
+pub(crate) fn plan_node_2_road(jerry: &mut Jerry, world: &mut World, node1: (usize, usize), local_road: Option<&HashSet<ChartedCoordinate>>) -> Vec<ChartedCoordinate> {
     let map = robot_map(world).unwrap();
     if let Some(road) = local_road{
         if let Ok(path) = dijkstra(jerry, world, &map, node1, HashSet::new(), Some(Some(&road))){
@@ -60,7 +58,7 @@ pub fn plan_node_2_road(jerry: &mut Jerry, world: &mut World, node1: (usize, usi
     println!("Failed to plan node_to_road");
     Vec::new()
 }
-pub fn plan_road_2_global(jerry: &mut Jerry, world: &mut World, road: &HashSet<ChartedCoordinate>) -> Vec<ChartedCoordinate> {
+pub(crate) fn plan_road_2_global(jerry: &mut Jerry, world: &mut World, road: &HashSet<ChartedCoordinate>) -> Vec<ChartedCoordinate> {
     let mut ret = Vec::new();
     for node in road.iter(){
         let path1 = plan_node_2_road(jerry, world, (node.0, node.1), None);
@@ -98,7 +96,7 @@ fn shrink_path(path: &mut Vec<ChartedCoordinate>, map: &Vec<Vec<Option<Tile>>>){
 }
 
 //the function gets the sector data and adds new missions for the robot
-pub fn generate_road_builders(jerry: &mut Jerry, world: &mut World, sector_data: SectorData){
+pub(crate) fn generate_road_builders(jerry: &mut Jerry, world: &mut World, sector_data: SectorData){
     let nodes = sector_data.nodes;
     let mut missions = 0;
     let map = robot_map(world).unwrap();
@@ -226,7 +224,7 @@ pub fn generate_road_builders(jerry: &mut Jerry, world: &mut World, sector_data:
 //calls the road builder
 //should save the last paved to be able to come back after collecting resources
 
-pub fn new_road_builder(path: &Vec<ChartedCoordinate>) -> Mission{
+pub(crate) fn new_road_builder(path: &Vec<ChartedCoordinate>) -> Mission{
     let mut to_pave = HashSet::new();
     for tile in path {
         to_pave.insert(tile.clone());
@@ -242,7 +240,7 @@ pub fn new_road_builder(path: &Vec<ChartedCoordinate>) -> Mission{
 //ideally, path should not contain crates
 //if it does, the function will skip a tile
 //if it contains a teleport, the function will teleport to that tile
-pub fn road_builder_execute(jerry: &mut Jerry, world: &mut World, mission_index: usize) -> Result<(), JerryStatus> {
+pub(crate) fn road_builder_execute(jerry: &mut Jerry, world: &mut World, mission_index: usize) -> Result<(), JerryStatus> {
     let mut new_tick = true;
     
     /*
@@ -427,9 +425,8 @@ fn bessie_controller(jerry: &mut Jerry, map: &Vec<Vec<Option<Tile>>>, world: &mu
                             else{
                                 if let Err(error) = vent_tool1.borrow_mut().vent_waypoint(jerry, world, 1000){
                                     match error{
-                                        //pretty much the only error that can happen
-                                        | vent_tool_ascii_crab::VentError::NotEnoughEnergy => return Err(RoadBuilderError::NotEnoughEnergy),   
-                                        //otherwise, idk
+                                        | vent_tool_ascii_crab::VentError::NotEnoughEnergy => return Err(RoadBuilderError::NotEnoughEnergy),
+                                        | vent_tool_ascii_crab::VentError::CommonCrateError(_) => return Err(RoadBuilderError::NotEnoughEnergy),
                                         | _ => panic!("{:?}", error),
                                     }
                                 }
@@ -473,9 +470,8 @@ fn bessie_controller(jerry: &mut Jerry, map: &Vec<Vec<Option<Tile>>>, world: &mu
                 else{
                     if let Err(error) = vent_tool2.borrow_mut().vent_waypoint(jerry, world, 1000){
                         match error{
-                            //pretty much the only error that can happen
                             | vent_tool_ascii_crab::VentError::NotEnoughEnergy => return Err(RoadBuilderError::NotEnoughEnergy),
-                            //otherwise, idk
+                            | vent_tool_ascii_crab::VentError::CommonCrateError(_) => return Err(RoadBuilderError::NotEnoughEnergy),
                             | _ => panic!("{:?}", error),
                         }
                     }
@@ -593,14 +589,14 @@ fn direction_to_coordinate(coord: (usize, usize), direction: Direction) -> (usiz
     }
 }
 #[derive(Debug, Clone, PartialEq, Copy)]
-pub enum RoadBuilderError{
+pub(crate) enum RoadBuilderError{
     NotEnoughEnergy,
     NotEnoughMaterial,
     CannotGetMaterial,
     RoadNonAccessible,
     CannotPaveTile,
 }
-pub struct RoadBuilderData{
+pub(crate) struct RoadBuilderData{
     to_pave: HashSet<ChartedCoordinate>,
     paved: HashSet<ChartedCoordinate>,
 }

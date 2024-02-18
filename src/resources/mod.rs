@@ -1,19 +1,16 @@
-use std::cell::RefCell;
+
 use std::collections::HashSet;
-use std::f32::consts::E;
-use std::rc::Rc;
 use crate::interface::Jerry;
 use charting_tools::charted_coordinate::ChartedCoordinate;
 use robotics_lib::interface::{destroy, put, where_am_i, Direction};
 use robotics_lib::runner::Runnable;
 use robotics_lib::world::World;
 use robotics_lib::world::tile::{Content, Tile, TileType};
-use rust_and_furious_dynamo::dynamo;
 use rust_eze_tomtom::plain::{self, PlainContent, PlainTileType};
 use rust_eze_tomtom::TomTom;
 use crate::resources::ResourceCollectorError::*;
 //collects a certain resource until the backpack is full
-pub fn get_content(jerry: &mut Jerry, world: &mut World, content: Content,
+pub(crate) fn get_content(jerry: &mut Jerry, world: &mut World, content: Content,
     planned_road: Option<&HashSet<ChartedCoordinate>>, desired_amount: usize) -> Result<usize, ResourceCollectorError> {
    println!("Getting content");
    if desired_amount > jerry.get_backpack().get_size(){
@@ -32,7 +29,7 @@ pub fn get_content(jerry: &mut Jerry, world: &mut World, content: Content,
 }
 
 //disposes the content till the moment there's enough space in the backpack
-pub fn empty_the_backpack(jerry: &mut Jerry, world: &mut World,
+pub(crate) fn empty_the_backpack(jerry: &mut Jerry, world: &mut World,
    planned_road: Option<&HashSet<ChartedCoordinate>>, space_needed: usize) -> Result<(), ResourceCollectorError> {
        println!("Emptying backpack");
        let mut contents: HashSet<Content> = HashSet::new();
@@ -67,7 +64,7 @@ pub fn empty_the_backpack(jerry: &mut Jerry, world: &mut World,
 
 //goes to a tile with a certain content and collects it (not on the tile directly, but on adjacent tiles)
 //returns the amount of collected content
-pub fn go_get_content(jerry: &mut Jerry, world: &mut World, content: Content) -> Result<usize, ResourceCollectorError> {
+pub(crate) fn go_get_content(jerry: &mut Jerry, world: &mut World, content: Content) -> Result<usize, ResourceCollectorError> {
    println!("Going to get content");
    //this is for converting the content to a plain content
    let plain_content = match_to_plain_content(content.clone());
@@ -101,7 +98,7 @@ pub fn go_get_content(jerry: &mut Jerry, world: &mut World, content: Content) ->
 //dispose a certain resource until it's all gone from the backpack
 //navigates to a closest suitable tile for disposing the resource (again not on the tile directly, but on adjacent tiles)
 //and tries to put it there
-pub fn go_dispose_content(jerry: &mut Jerry, world: &mut World, content: Content, planned_road: Option<&HashSet<ChartedCoordinate>>) -> Result<usize, ResourceCollectorError> {
+pub(crate) fn go_dispose_content(jerry: &mut Jerry, world: &mut World, content: Content, planned_road: Option<&HashSet<ChartedCoordinate>>) -> Result<usize, ResourceCollectorError> {
    println!("Going to dispose content");
    //get the tile types and contents that can hold the content
    let (tile_types, contents) = ways_to_dispose(content.clone());
@@ -151,7 +148,7 @@ pub fn go_dispose_content(jerry: &mut Jerry, world: &mut World, content: Content
    Err(NoWayToDispose)
 }
 
-pub fn get_content_around(jerry: &mut Jerry, view: &Vec<Vec<Option<Tile>>>, world: &mut World, content: Content) -> Result<usize, ResourceCollectorError>{
+pub(crate) fn get_content_around(jerry: &mut Jerry, view: &Vec<Vec<Option<Tile>>>, world: &mut World, content: Content) -> Result<usize, ResourceCollectorError>{
    println!("Trying to get content around");
    if jerry.get_backpack().get_size() == jerry.get_backpack().get_contents().values().sum::<usize>(){
        return Err(BackPackIsFull);
@@ -483,7 +480,7 @@ fn match_to_plain_tile_type(tile_type: TileType) -> PlainTileType{
    }
 }
 #[derive(Debug, Copy, Clone)]
-pub enum ResourceCollectorError{
+pub(crate) enum ResourceCollectorError{
    BackPackIsFull,
    NotEnoughEnergy,
    PathNotFound,

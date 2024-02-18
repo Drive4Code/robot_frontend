@@ -2,8 +2,6 @@
 use crate::interface::Jerry;
 use crate::explorer::robot_map_slice_n;
 use std::collections::{HashSet, VecDeque};
-use std::hash::Hash;
-use std::num::ParseIntError;
 use charting_tools::charted_coordinate::ChartedCoordinate;
 use robotics_lib::interface::Direction;
 use robotics_lib::runner::Runnable;
@@ -18,7 +16,7 @@ use robotics_lib::interface::teleport;
 use robotics_lib::interface::go;
 
 
-pub fn go_to_coordinates(
+pub(crate) fn go_to_coordinates(
     robot: &mut Jerry,
     map: &Vec<Vec<Option<Tile>>>,
     world: &mut World,
@@ -55,7 +53,7 @@ pub fn go_to_coordinates(
         }
     }
 }
-pub fn get_path_to_coordinates(
+pub(crate) fn get_path_to_coordinates(
     world: &World,
     robot: &mut Jerry,
     map: &Vec<Vec<Option<Tile>>>,
@@ -83,17 +81,17 @@ pub fn get_path_to_coordinates(
     }
 }
 #[derive(Debug, Clone)]
-pub enum Action {
+pub(crate) enum Action {
     Go(Direction),
     Teleport((usize, usize)),
 }
 
 #[derive(Debug, Default, Clone)]
-pub struct Path {
-    pub source: (usize, usize),
-    pub destination: (usize, usize),
-    pub actions: VecDeque<Action>,
-    pub cost: usize,
+pub(crate) struct Path {
+    pub(crate) source: (usize, usize),
+    pub(crate) destination: (usize, usize),
+    pub(crate) actions: VecDeque<Action>,
+    pub(crate) cost: usize,
 }
 
 impl Path {

@@ -5,8 +5,6 @@ use std::collections::{HashSet};
 
 use std::rc::Rc;
 use std::cell::RefCell;
-
-use bounce::use_atom;
 use charting_tools::charted_coordinate::ChartedCoordinate;
 use charting_tools::charted_paths::ChartedPaths;
 use charting_tools::ChartingTools;
@@ -17,7 +15,6 @@ use robotics_lib::world::tile::Tile;
 use robotics_lib::world::{World};
 
 use rust_eze_tomtom::TomTom;
-use yew_hooks::use_timeout;
 use crate::biomes::{detect_biome, is_weather_gonna_be_nice_n, is_weather_nice};
 use crate::explorer::ExplorerError::{FailedToGo, FrontierNotAccessible};
 use crate::fast_paths::go_to_coordinates;
@@ -31,7 +28,7 @@ use rust_and_furious_dynamo::dynamo::Dynamo;
 use rand::Rng;
 use crate::interface::ExtrasState;
 
-pub fn new_explorer(jerry: &mut Jerry, world: &mut World, spatial_index: usize) -> Mission{
+pub(crate) fn new_explorer(jerry: &mut Jerry, world: &mut World, spatial_index: usize) -> Mission{
     let (frontier, frontier_hs) = initialize_frontier(jerry, world);
     Mission{
         name: "Explore".to_string(),
@@ -39,7 +36,7 @@ pub fn new_explorer(jerry: &mut Jerry, world: &mut World, spatial_index: usize) 
         additional_data: Some(Box::new(ExplorerData{frontier, frontier_hs, spatial_index, robot_moved: false})),
     }
 }
-pub fn explorer_execute(jerry: &mut Jerry, world: &mut World, mission_index: usize) -> Result<(), JerryStatus>{
+pub(crate) fn explorer_execute(jerry: &mut Jerry, world: &mut World, mission_index: usize) -> Result<(), JerryStatus>{
     //initialize the frontier in the beginning of the simulation
     let mut new_tick = true;
     for _ in 0..1{
@@ -224,7 +221,7 @@ pub fn explorer_execute(jerry: &mut Jerry, world: &mut World, mission_index: usi
     Err(JerryStatus::CallingNextTick)
 }
 //initialize the frontier when adding the new explorer mission
-pub fn initialize_frontier(jerry: &mut Jerry, world: &mut World) -> (Vec<ChartedCoordinate>, HashSet<ChartedCoordinate>){
+pub(crate) fn initialize_frontier(jerry: &mut Jerry, world: &mut World) -> (Vec<ChartedCoordinate>, HashSet<ChartedCoordinate>){
     let (_, spawn_coordinates) = where_am_i(jerry, world);
     let map = robot_map(world).unwrap();
     let mut frontier: Vec<ChartedCoordinate> = Vec::new();
@@ -491,14 +488,14 @@ pub(crate) fn robot_map_slice_n
     );
     robot_map_slice(robot_map, top_left, bottom_right)
 }
-pub struct ExplorerData{
-    pub frontier: Vec<ChartedCoordinate>,
-    pub frontier_hs: HashSet<ChartedCoordinate>,
-    pub spatial_index: usize,
-    pub robot_moved: bool,
+pub(crate) struct ExplorerData{
+    pub(crate) frontier: Vec<ChartedCoordinate>,
+    pub(crate) frontier_hs: HashSet<ChartedCoordinate>,
+    pub(crate) spatial_index: usize,
+    pub(crate) robot_moved: bool,
 }
 #[derive(Debug)]
-pub enum ExplorerError{
+pub(crate) enum ExplorerError{
     FrontierNotAccessible,
     FailedToGo,
     NotEnoughEnergy,

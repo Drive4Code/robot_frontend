@@ -15,7 +15,7 @@ use self::dbscan::map_into_db_input;
 
 
 
-pub fn new_sector_analyzer(spatial_index: usize, world_dim: usize) -> Mission {
+pub(crate) fn new_sector_analyzer(spatial_index: usize, world_dim: usize) -> Mission {
     let (tl, br) = get_tl_and_br_from_spatial_index(spatial_index, world_dim);
     Mission {
         name: "Sector Analyzer".to_string(),
@@ -36,7 +36,7 @@ pub fn new_sector_analyzer(spatial_index: usize, world_dim: usize) -> Mission {
         markets and banks
 
 */
-pub fn analyzer_execute(world: &mut World, tl: (usize, usize), br: (usize, usize)) -> SectorData{
+pub(crate) fn analyzer_execute(world: &mut World, tl: (usize, usize), br: (usize, usize)) -> SectorData{
     let robot_map = robot_map(world).unwrap();
     let sector_map = robot_map_slice(&robot_map,tl, br).unwrap();
     let sector_resources = sector_collectable(&sector_map);
@@ -91,7 +91,7 @@ pub fn analyzer_execute(world: &mut World, tl: (usize, usize), br: (usize, usize
 
 
 }
-pub fn sector_collectable(sector: &Vec<Vec<Option<Tile>>>) -> HashMap<Content, usize>{
+pub(crate) fn sector_collectable(sector: &Vec<Vec<Option<Tile>>>) -> HashMap<Content, usize>{
     let mut resources = HashMap::new();
     for row in sector.iter(){
         for tile in row.iter(){
@@ -114,21 +114,21 @@ pub fn sector_collectable(sector: &Vec<Vec<Option<Tile>>>) -> HashMap<Content, u
 }
 
 #[derive(Debug)]
-pub struct SectorData{
-    pub resources: HashMap<Content, usize>,
-    pub mountain_tiles: usize,
-    pub is_random: bool,
-    pub nodes: Vec<(usize, usize)>,
+pub(crate) struct SectorData{
+    pub(crate) resources: HashMap<Content, usize>,
+    pub(crate) mountain_tiles: usize,
+    pub(crate) is_random: bool,
+    pub(crate) nodes: Vec<(usize, usize)>,
 }
 
-pub fn is_content_random(sector: &Vec<Vec<Option<Tile>>>) -> bool{
+pub(crate) fn is_content_random(sector: &Vec<Vec<Option<Tile>>>) -> bool{
     let m = morans_i(sector);
     if m < 0.1{
         return true;
     }
     false
 }
-pub fn find_largest_connected_subset(map: &Vec<Vec<Option<Tile>>>) -> Vec<(usize, usize)>{
+pub(crate) fn find_largest_connected_subset(map: &Vec<Vec<Option<Tile>>>) -> Vec<(usize, usize)>{
     let mut visited = HashSet::new();
     let mut largest_subset = Vec::new();
     for i in 0..map.len(){
