@@ -98,7 +98,7 @@ pub fn execute_mission (jerry: &mut Jerry, world: &mut World){
     println!("Act Exp: {} Wait Exp: {} Comp Exp: {} Act RB: {} Wait RB: {} Comp RB {}", 
     active_explorers, waiting_explorers, completed_explorers, active_road_builders, waiting_road_builders, completed_road_builders);
     //after every 2 completed explorers, set road builders to active and pause the active explorers
-    if completed_explorers > 0 && completed_explorers % 2 == 0 && waiting_road_builders > 0{
+    if (completed_explorers > 0 && completed_explorers % 2 == 0) && waiting_road_builders > 0{
         for mission in jerry.missions.iter_mut(){
             if mission.name == "Explore" && (mission.status == MissionStatus::Active || mission.status == MissionStatus::New){
                 mission.status = MissionStatus::Paused;
@@ -109,7 +109,7 @@ pub fn execute_mission (jerry: &mut Jerry, world: &mut World){
         }
     }
     //after every 2 completed builders set explorers to active and pause the active builders
-    if waiting_explorers > 0 && completed_road_builders > 0 && (completed_road_builders % 2 == 0 || active_road_builders == 0){
+    if waiting_explorers > 0 &&  active_road_builders == 0{
         for mission in jerry.missions.iter_mut(){
             if mission.name == "Explore" && mission.status == MissionStatus::Paused{
                 mission.status = MissionStatus::Active;
