@@ -110,7 +110,7 @@ pub(crate) fn execute_mission (jerry: &mut Jerry, world: &mut World){
             }
         }
     }
-    let mission = jerry.missions.iter_mut().enumerate().find(|(i, mission)| 
+    let mission = jerry.missions.iter_mut().enumerate().find(|(_i, mission)| 
     (mission.status == MissionStatus::Active) || (mission.status == MissionStatus::New));
     if mission.is_none() {
         println!("I got nothing to do!");
@@ -161,7 +161,7 @@ pub(crate) fn get_tl_and_br_from_spatial_index(spatial_index: usize, size: usize
     let section_index_row = spatial_index / num_sections_cols;
 
     //first calculate the default values
-    let mut top_left = (section_index_row * num_rows_per_section, section_index_col * num_cols_per_section);
+    let top_left = (section_index_row * num_rows_per_section, section_index_col * num_cols_per_section);
     let mut bottom_right = (top_left.0 + num_rows_per_section - 1, top_left.1 + num_cols_per_section - 1);
     println!("{:?}", (top_left, bottom_right));
     if size % SECTOR_DIMENSION == 0 {

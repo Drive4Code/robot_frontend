@@ -6,7 +6,7 @@ use robotics_lib::interface::{destroy, put, where_am_i, Direction};
 use robotics_lib::runner::Runnable;
 use robotics_lib::world::World;
 use robotics_lib::world::tile::{Content, Tile, TileType};
-use rust_eze_tomtom::plain::{self, PlainContent, PlainTileType};
+use rust_eze_tomtom::plain::{PlainContent, PlainTileType};
 use rust_eze_tomtom::TomTom;
 use crate::resources::ResourceCollectorError::*;
 //collects a certain resource until the backpack is full

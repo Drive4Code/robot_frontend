@@ -4,7 +4,7 @@ use ohcrab_weather::weather_tool::WeatherPredictionTool;
 // Project imports
 use robotics_lib::energy::Energy;
 use robotics_lib::event::events::Event;
-use robotics_lib::interface::{look_at_sky, robot_map, get_score};
+use robotics_lib::interface::{look_at_sky, robot_map};
 
 use robotics_lib::runner::backpack::BackPack;
 use robotics_lib::runner::{Robot, Runnable, Runner};
@@ -16,10 +16,7 @@ use crate::explorer::new_explorer;
 use crate::utils::{
     calculate_spatial_index, execute_mission, get_world_dimension, ActiveRegion, Mission,
 };
-use robotics_lib::world::tile::Content::{
-    Bank, Bin, Building, Bush, Coin, Crate, Fire, Fish, Garbage, JollyBlock, Market, Rock,
-    Scarecrow, Tree, Water,
-};
+
 use robotics_lib::world::tile::TileType::{
     DeepWater, Grass, Hill, Lava, Mountain, Sand, ShallowWater, Snow, Street, Teleport,
 };
@@ -37,9 +34,9 @@ use log::info;
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
-use wasm_bindgen::{JsCast, JsValue};
+use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
-use web_sys::{window, HtmlElement, HtmlInputElement, Element};
+use web_sys::{window, Element, HtmlInputElement};
 use yew::prelude::*;
 use yew::{function_component, html, Html, Properties};
 
@@ -120,9 +117,7 @@ pub(crate) struct ExtrasState {
 
 impl Default for ExtrasState {
     fn default() -> Self {
-        Self {
-            score: 0.0,
-        }
+        Self { score: 0.0 }
     }
 }
 
@@ -144,7 +139,6 @@ impl Default for StartingSettings {
         }
     }
 }
-
 
 #[function_component(Main)]
 pub fn main() -> Html {
@@ -173,10 +167,10 @@ pub fn main() -> Html {
 
                 let on_tick_time_input = {
                     let settings = settings.clone();
-            
+
                     Callback::from(move |e: InputEvent| {
                         let input: HtmlInputElement = e.target_unchecked_into();
-            
+
                         settings.set(StartingSettings { follow_robot: settings.follow_robot.clone(), start_ai: settings.start_ai.clone(), tile_size: settings.tile_size.clone(), tick_time: input.value().parse::<u32>().expect("Expected u32 as tick time") });
                     })
                 };
@@ -208,7 +202,6 @@ pub fn main() -> Html {
     }
 }
 
-
 #[function_component(Menu)]
 fn menu() -> Html {
     let settings = use_atom::<StartingSettings>();
@@ -234,7 +227,12 @@ fn menu() -> Html {
         let settings = settings.clone();
 
         Callback::from(move |_| {
-            settings.set(StartingSettings { follow_robot: !settings.follow_robot.clone(), start_ai: true, tile_size: settings.tile_size.clone(), tick_time: settings.tick_time.clone() });
+            settings.set(StartingSettings {
+                follow_robot: !settings.follow_robot.clone(),
+                start_ai: true,
+                tile_size: settings.tile_size.clone(),
+                tick_time: settings.tick_time.clone(),
+            });
         })
     };
 
@@ -245,7 +243,6 @@ fn menu() -> Html {
             <button type={"checkbox"} onclick={follow_bot_fn}>{"Toggle Freelook"}</button>
         </div>
     }
-
 }
 
 #[function_component(BackP)]
@@ -304,76 +301,110 @@ fn energy_display() -> Html {
 #[function_component(EnviromentBar)]
 fn enviroment_display() -> Html {
     let enviroment_state = use_atom::<EnviromentalState>();
-    let forecast_image = match_forecast(&enviroment_state.forecast);
+    let forecast_image = match_forecast(&enviroment_state.forecast, &enviroment_state.time);
 
     html! {
         <div id="enviroment">
         <h3>{format!("{}", &enviroment_state.time)}</h3>
             <img src={forecast_image} />
-            
+
         </div>
     }
 }
 
-fn match_forecast(conditions: &WeatherType) -> String {
+fn match_forecast(conditions: &WeatherType, time: &str) -> &'static str {
+    const SUNNY_ICON: &'static str =
+        "https://www.pngall.com/wp-content/uploads/2016/07/Sun-PNG-Image-180x180.png";
+    const MOON_ICON: &'static str = "img/moon-min.png";
+    const RAINY_ICON: &'static str = "https://borregowildflowers.org/img_sys/rain.png";
+    const FOGGY_ICON: &'static str = "https://cdn-icons-png.flaticon.com/128/2076/2076827.png";
+    const TROPICAL_MONSOON_ICON: &'static str = "https://heat-project.weebly.com/uploads/7/1/4/2/71428073/published/bez-nazxdccwy-1_1.png?1533897845";
+    const TRENTINO_SNOW_ICON: &'static str =
+        "https://cdn.icon-icons.com/icons2/33/PNG/128/snow_cloud_weather_2787.png";
+
+    let hour: u8 = if time.len() >= 2 {
+        time[0..2].parse::<u8>().unwrap_or_default()
+    } else {
+        12
+    };
+
     match conditions {
-        WeatherType::Sunny => "https://www.pngall.com/wp-content/uploads/2016/07/Sun-PNG-Image-180x180.png".to_string(),
-        WeatherType::Rainy => "https://borregowildflowers.org/img_sys/rain.png".to_string(),
-        WeatherType::Foggy => "https://cdn-icons-png.flaticon.com/128/2076/2076827.png".to_string(),
-        WeatherType::TropicalMonsoon => "https://heat-project.weebly.com/uploads/7/1/4/2/71428073/published/bez-nazxdccwy-1_1.png?1533897845".to_string(),
-        WeatherType::TrentinoSnow => "https://cdn.icon-icons.com/icons2/33/PNG/128/snow_cloud_weather_2787.png".to_string(),
+        WeatherType::Sunny => match hour {
+            19..=23 | 00..=05 => MOON_ICON,
+            _ => SUNNY_ICON,
+        },
+        WeatherType::Rainy => RAINY_ICON,
+        WeatherType::Foggy => FOGGY_ICON,
+        WeatherType::TropicalMonsoon => TROPICAL_MONSOON_ICON,
+        WeatherType::TrentinoSnow => TRENTINO_SNOW_ICON,
     }
 }
-
 
 #[function_component(MapView)]
 pub fn map_view() -> Html {
     let world_state = use_atom::<WorldState>();
     let robot_state = use_atom::<RobotState>();
     let settings = use_atom::<StartingSettings>();
-    // let extra_state = use_atom::<ExtrasState>();
-    let world_styles = format!("width: {}px; height: {}px; background-color: var(--background-color);", settings.tile_size.clone().to_string(), settings.tile_size.clone().to_string());
+    let cond_state = use_atom::<EnviromentalState>();
+    
+    // Simplified time parsing and world style calculation
+    let hour: u8 = cond_state.time.get(..2).and_then(|s| s.parse().ok()).unwrap_or(12);
+    let world_styles: String;
 
-    use_effect(move || {
-        if settings.follow_robot.clone() == true {
-        if let Some(window) = web_sys::window() {
-            if let Some(document) = window.document() {
-                if let Some(robot_element) = document.get_element_by_id("robot") {
-                    // As HtmlElement for scroll_into_view
-                    let robot_html_element = robot_element.dyn_into::<Element>().unwrap();
-                    // let rect = robot_html_element.get_bounding_client_rect();
-                    robot_html_element.scroll_into_view();
-                    // window.scroll_by_with_x_and_y(0.0, -500.0);
-                    // .scroll_into_view_with_bool(true);
-                }
-            }
+    let hour: u8 = if cond_state.time.len() >= 2 {
+        cond_state.time[0..2].parse::<u8>().unwrap_or_default()
+    } else {
+        12
+    };
+    match hour {
+        19..=23 | 00..=05 => {
+            world_styles = format!(
+                "width: {}px; height: {}px; background-color: black;",
+                settings.tile_size.clone().to_string(),
+                settings.tile_size.clone().to_string()
+            );
+        }
+        _ => {
+            world_styles = format!(
+                "width: {}px; height: {}px; background-color: var(--background-color);",
+                settings.tile_size.clone().to_string(),
+                settings.tile_size.clone().to_string()
+            );
         }
     }
+    
+    
 
+    // Use effect for following the robot
+    use_effect_with((settings.follow_robot, robot_state.coord), move |_| {
+        if settings.follow_robot {
+            if let Some(robot_element) = window().and_then(|win| win.document()).and_then(|doc| doc.get_element_by_id("robot")) {
+                let robot_html_element = robot_element.dyn_into::<Element>().expect("Failed to cast to HtmlElement");
+                robot_html_element.scroll_into_view();
+            }
+        }
         || ()
     });
-        
+
     html! {
         <div id={"robot_view"}>
-            {for world_state.world.clone().iter().enumerate().map(|(i, row)| {
+            {for world_state.world.iter().enumerate().map(|(i, row)| {
                 html! {
-                    < div class={classes!("map_row")}>
-                        { for row.iter().enumerate().map(|(j, tile_option)| {
-                            match tile_option {
-                                Some(tile) => html! {
-                                    <div class={"tile"} style={world_styles.clone()}>
-                                    <MapTile tile={tile.clone()}/>
-                                    {if i == robot_state.coord.0.clone() && j == robot_state.coord.1.clone() {
-                                                    html! {<img id={"robot"} src={"https://icons.iconarchive.com/icons/google/noto-emoji-smileys/1024/10103-robot-face-icon.png"} />}
+                    <div class={classes!("map_row")}>
+                        {for row.iter().enumerate().map(|(j, tile_option)| {
+                            html! {
+                                <div class={classes!("tile")} style={world_styles.to_owned()}>
+                                    {if let Some(tile) = tile_option {
+                                        html! {<MapTile tile={tile.to_owned()} />}
                                     } else {
                                         html! {}
                                     }}
-                                    </div>
-                                    },
-                                None => html! {
-                                    // <></>
-                                    <div class={classes!("tile")} style={world_styles.clone()}></div>
-                                },
+                                    {if i == robot_state.coord.0 && j == robot_state.coord.1 {
+                                        html! {<img id={"robot"} src={"https://icons.iconarchive.com/icons/google/noto-emoji-smileys/1024/10103-robot-face-icon.png"} />}
+                                    } else {
+                                        html! {}
+                                    }}
+                                </div>
                             }
                         })}
                     </div>
@@ -393,8 +424,11 @@ pub fn map_tile(props: &MapTileProps) -> Html {
     let cond_state = use_atom::<EnviromentalState>();
     let settings = use_atom::<StartingSettings>();
     // let extra_state = use_atom::<ExtrasState>();
-    let world_styles = format!("width: {}px; height: {}px; background-color: var(--background-color);", settings.tile_size.clone().to_string(), settings.tile_size.clone().to_string());
-    let world_style = &world_styles[..];
+    let world_style: &str = &format!(
+        "width: {}px; height: {}px;",
+        settings.tile_size.clone().to_string(),
+        settings.tile_size.clone().to_string()
+    )[..];
     let hour: u8 = cond_state.time[0..2]
         .to_owned()
         .parse::<u8>()
@@ -409,9 +443,12 @@ pub fn map_tile(props: &MapTileProps) -> Html {
             daytime = true;
         }
     }
+
     match daytime {
         true => match props.tile.tile_type {
-            TileType::Wall => tile_style = format!("{} background-color: rgb(125, 125, 125);", world_style),
+            TileType::Wall => {
+                tile_style = format!("{} background-color: rgb(125, 125, 125);", world_style)
+            }
             DeepWater => tile_style = format!("{} background-color: #2B00FF;", world_style),
             ShallowWater => tile_style = format!("{} background-color: #00B3FF;", world_style),
             Sand => tile_style = format!("{} background-color: #FFC400;", world_style),
@@ -424,7 +461,9 @@ pub fn map_tile(props: &MapTileProps) -> Html {
             Teleport(_) => tile_style = format!("{} background-color: #BC1FEC;", world_style),
         },
         false => match props.tile.tile_type {
-            TileType::Wall => tile_style = format!("{} background-color: rgb(125, 125, 125);", world_style),
+            TileType::Wall => {
+                tile_style = format!("{} background-color: rgb(125, 125, 125);", world_style)
+            }
             DeepWater => tile_style = format!("{} background-color: #030C58;", world_style),
             ShallowWater => tile_style = format!("{} background-color: #074A84;", world_style),
             Sand => tile_style = format!("{} background-color: #A5931B;", world_style),
@@ -476,10 +515,11 @@ pub fn map_tile_content(props: &MapTileProps) -> Html {
     }
 }
 
-fn content_match_day(input: &Content) -> &'static str{
+fn content_match_day(input: &Content) -> &'static str {
     // Define constant image URLs
     const ROCK_IMAGE: &str = "img/rock-min.png";
-    const TREE_IMAGE: &str = "https://minecraft.wiki/images/thumb/Azalea_Tree.png/250px-Azalea_Tree.png?945ad";
+    const TREE_IMAGE: &str =
+        "https://minecraft.wiki/images/thumb/Azalea_Tree.png/250px-Azalea_Tree.png?945ad";
     const GARBAGE_IMAGE: &str = "img/garbage-min.png";
     const FIRE_IMAGE: &str = "img/fire.webp";
     const COIN_IMAGE: &str = "img/coin-min.png";
@@ -488,33 +528,33 @@ fn content_match_day(input: &Content) -> &'static str{
     const BANK_IMAGE: &str = "https://vignette.wikia.nocookie.net/pixelpeople/images/a/ae/Bank.png/revision/latest?cb=20130904201633";
     const WATER_IMAGE: &str = "img/water-min.png";
     const MARKET_IMAGE: &str = "img/market-min.png";
-    const FISH_IMAGE: &str = "https://gamepedia.cursecdn.com/minecraft_gamepedia/a/ad/Tropical_Fish_JE2_BE2.png";
-    const BUILDING_IMAGE: &str = "https://gamepedia.cursecdn.com/minecraft_gamepedia/f/f5/Plains_Cartographer_1.png";
+    const FISH_IMAGE: &str =
+        "https://gamepedia.cursecdn.com/minecraft_gamepedia/a/ad/Tropical_Fish_JE2_BE2.png";
+    const BUILDING_IMAGE: &str =
+        "https://gamepedia.cursecdn.com/minecraft_gamepedia/f/f5/Plains_Cartographer_1.png";
     const BUSH_IMAGE: &str = "img/bush.webp";
     const JOLLY_BLOCK_IMAGE: &str = "img/jolly-min.png";
     const SCARECROW_IMAGE: &str = "img/scarecrow-min.png";
     const EMPTY_IMAGE: &str = "";
 
-        match input {
-            Content::Rock(_) => ROCK_IMAGE,
-            Content::Tree(_) => TREE_IMAGE,
-            Content::Garbage(_) => GARBAGE_IMAGE,
-            Content::Fire => FIRE_IMAGE,
-            Content::Coin(_) => COIN_IMAGE,
-            Content::Bin(_) => BIN_IMAGE,
-            Content::Crate(_) => CRATE_IMAGE,
-            Content::Bank(_) => BANK_IMAGE,
-            Content::Water(_) => WATER_IMAGE,
-            Content::Market(_) => MARKET_IMAGE,
-            Content::Fish(_) => FISH_IMAGE,
-            Content::Building => BUILDING_IMAGE,
-            Content::Bush(_) => BUSH_IMAGE,
-            Content::JollyBlock(_) => JOLLY_BLOCK_IMAGE,
-            Content::Scarecrow => SCARECROW_IMAGE,
-            Content::None => EMPTY_IMAGE,
-        }
-
-
+    match input {
+        Content::Rock(_) => ROCK_IMAGE,
+        Content::Tree(_) => TREE_IMAGE,
+        Content::Garbage(_) => GARBAGE_IMAGE,
+        Content::Fire => FIRE_IMAGE,
+        Content::Coin(_) => COIN_IMAGE,
+        Content::Bin(_) => BIN_IMAGE,
+        Content::Crate(_) => CRATE_IMAGE,
+        Content::Bank(_) => BANK_IMAGE,
+        Content::Water(_) => WATER_IMAGE,
+        Content::Market(_) => MARKET_IMAGE,
+        Content::Fish(_) => FISH_IMAGE,
+        Content::Building => BUILDING_IMAGE,
+        Content::Bush(_) => BUSH_IMAGE,
+        Content::JollyBlock(_) => JOLLY_BLOCK_IMAGE,
+        Content::Scarecrow => SCARECROW_IMAGE,
+        Content::None => EMPTY_IMAGE,
+    }
 }
 
 #[function_component(ScoreDisplay)]
@@ -746,7 +786,10 @@ pub(crate) struct MyRobot {
     pub(crate) en: UseAtomHandle<EnergyState>,
 }
 
-async fn run_game(run: Rc<RefCell<Result<Runner, LibError>>>, settings: UseAtomHandle<StartingSettings>) -> () {
+async fn run_game(
+    run: Rc<RefCell<Result<Runner, LibError>>>,
+    settings: UseAtomHandle<StartingSettings>,
+) -> () {
     let tick_time = settings.tick_time.clone();
     // let mut counter = 0;
     sleep(1000).await;
@@ -767,7 +810,7 @@ async fn run_game(run: Rc<RefCell<Result<Runner, LibError>>>, settings: UseAtomH
                 info!("[ RUNNER ] ERROR WITH RUN. ");
             });
         sleep(tick_time).await;
-        
+
         // counter = counter +1;
     }
 }

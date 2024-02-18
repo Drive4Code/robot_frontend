@@ -414,7 +414,7 @@ pub(crate) fn get_adjacent_tiles(
 
 
 pub(crate) fn calculate_go_cost(
-    robot: &impl Runnable,
+    _robot: &impl Runnable,
     world: &World,
     map: &Vec<Vec<Option<Tile>>>,
     source: (usize, usize),
@@ -452,7 +452,7 @@ pub(crate) fn calculate_go_cost(
 }
 pub(crate) fn calculate_go_cost_for_road(
     jerry: &Jerry,
-    world: &World,
+    _world: &World,
     map: &Vec<Vec<Option<Tile>>>,
     source: (usize, usize),
     direction: Direction,
@@ -480,7 +480,7 @@ pub(crate) fn calculate_go_cost_for_road(
         return Err(String::from("Go not allowed!"));
     }
 
-    let mut base_cost = match destination.tile_type {
+    let base_cost = match destination.tile_type {
         TileType::Street => 0,
         TileType::Hill => 1,
         TileType::Mountain => 0,

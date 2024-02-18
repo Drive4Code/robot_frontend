@@ -74,7 +74,7 @@ pub(crate) fn analyzer_execute(world: &mut World, tl: (usize, usize), br: (usize
         }
     }
     println!("Clusters len: {}", clusters.len());
-    for (c, cores) in clusters.iter(){
+    for (_c, cores) in clusters.iter(){
         let mut centroid = get_centroid(cores);
         //turn the relative coordinates into absolute
         centroid.0 += tl.0;
@@ -100,7 +100,7 @@ pub(crate) fn sector_collectable(sector: &Vec<Vec<Option<Tile>>>) -> HashMap<Con
                 if !content.properties().destroy(){
                     continue;
                 }  
-                let mut count = resources.entry(content.to_default().clone()).or_insert(0);
+                let count = resources.entry(content.to_default().clone()).or_insert(0);
                 match content.get_value(){
                     (Some(amount), None) => {
                         *count += amount;

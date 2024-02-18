@@ -20,7 +20,7 @@ use charting_tools::charted_paths::ChartedPaths;
 use charting_tools::ChartingTools;
 use crate::utils::Mission;
 use crate::utils::MissionStatus::Paused;
-use crate::utils::MissionStatus::Active;
+
 use crate::utils::MissionStatus::Completed;
 use crate::road_builder::RoadBuilderError::RoadNonAccessible;
 
@@ -241,7 +241,7 @@ pub(crate) fn new_road_builder(path: &Vec<ChartedCoordinate>) -> Mission{
 //if it does, the function will skip a tile
 //if it contains a teleport, the function will teleport to that tile
 pub(crate) fn road_builder_execute(jerry: &mut Jerry, world: &mut World, mission_index: usize) -> Result<(), JerryStatus> {
-    let mut new_tick = true;
+    let new_tick = true;
     
     /*
         Following algorithm:
@@ -541,7 +541,7 @@ fn choose_tile_to_pave(jerry: &mut Jerry, tool: ChartedPaths, mission_index: usi
     let mut candidate_cost = 0;
     //iterate first over the last 10 added frontier tiles then 20 then 30 and so on
     while start > 0{
-        let end = start;
+        let _end = start;
         start = start.saturating_sub(search_depth);
 
         //candidate is the tile with the minimum cost to go to

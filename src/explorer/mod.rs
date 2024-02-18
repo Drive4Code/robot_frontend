@@ -26,7 +26,7 @@ use crate::utils::{calculate_spatial_index, robot_map_slice, ActiveRegion, Jerry
 use crate::utils::MissionStatus::{Active, Completed, New};
 use rust_and_furious_dynamo::dynamo::Dynamo;
 use rand::Rng;
-use crate::interface::ExtrasState;
+
 
 pub(crate) fn new_explorer(jerry: &mut Jerry, world: &mut World, spatial_index: usize) -> Mission{
     let (frontier, frontier_hs) = initialize_frontier(jerry, world);
@@ -122,7 +122,7 @@ pub(crate) fn explorer_execute(jerry: &mut Jerry, world: &mut World, mission_ind
         if selected_tile.is_err(){
             println!("FRONTIER NOT ACCESSIBLE");
             let mut mission = jerry.missions.get_mut(mission_index);
-            let data: &ExplorerData = mission.as_ref().unwrap().additional_data.as_ref().unwrap().downcast_ref().unwrap();
+            let _data: &ExplorerData = mission.as_ref().unwrap().additional_data.as_ref().unwrap().downcast_ref().unwrap();
             mission.as_mut().unwrap().status = Completed;
 
             let new_analyzer = new_sector_analyzer(spatial_index, jerry.world_dim);
@@ -386,7 +386,7 @@ fn update_frontier(jerry: &mut Jerry, world: &mut World, map: &Vec<Vec<Option<Ti
             //check if there's a mission for the spatial index of the tile that has the status New
             //in this case we don't need to initialize a new mission
             let jerry_immut = jerry.borrow();
-            let data: &ExplorerData = jerry_immut.missions.get(mission_index).unwrap().additional_data.as_ref().unwrap().downcast_ref().unwrap();
+            let _data: &ExplorerData = jerry_immut.missions.get(mission_index).unwrap().additional_data.as_ref().unwrap().downcast_ref().unwrap();
             let mission_exists = jerry_immut.missions.iter().any(|mission| {
                 if let Some(explorer_data) = mission.additional_data.as_ref().unwrap().downcast_ref::<ExplorerData>(){
                     explorer_data.spatial_index == spatial_index && (mission.status == New || mission.status == Active)
