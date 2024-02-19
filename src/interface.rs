@@ -347,6 +347,8 @@ pub fn map_view() -> Html {
     let settings = use_atom::<StartingSettings>();
     let cond_state = use_atom::<EnviromentalState>();
     
+    const ROBOT_IMG: &'static str = "img/robot-min.png";
+
     let world_styles: String;
 
     let hour: u8 = if cond_state.time.len() >= 2 {
@@ -398,7 +400,7 @@ pub fn map_view() -> Html {
                                         html! {}
                                     }}
                                     {if i == robot_state.coord.0 && j == robot_state.coord.1 {
-                                        html! {<img id={"robot"} src={"https://icons.iconarchive.com/icons/google/noto-emoji-smileys/1024/10103-robot-face-icon.png"} />}
+                                        html! {<img id={"robot"} src={ROBOT_IMG} />}
                                     } else {
                                         html! {}
                                     }}

@@ -530,7 +530,7 @@ dependencies = [
 
 [[package]]
 name = "frontend_wasm"
-version = "2.2.1"
+version = "2.2.3"
 dependencies = [
  "bessie",
  "bincode",
