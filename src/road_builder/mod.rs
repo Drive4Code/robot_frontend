@@ -25,7 +25,7 @@ use crate::utils::MissionStatus::Completed;
 use crate::road_builder::RoadBuilderError::RoadNonAccessible;
 
 const TO_REMOVE_FROM_BP: usize = 7;
-pub(crate) fn plan_node_2_node(jerry: &mut Jerry, world: &mut World, node1: (usize, usize), node2: (usize, usize)) -> Vec<ChartedCoordinate> {
+pub fn plan_node_2_node(jerry: &mut Jerry, world: &mut World, node1: (usize, usize), node2: (usize, usize)) -> Vec<ChartedCoordinate> {
     let target = HashSet::from([node2]);
     let road = HashSet::from([ChartedCoordinate(node2.0, node2.1)]);
     let map = robot_map(world).unwrap();
@@ -38,7 +38,7 @@ pub(crate) fn plan_node_2_node(jerry: &mut Jerry, world: &mut World, node1: (usi
     println!("Failed to plan node to node");
     Vec::new()
 }
-pub(crate) fn plan_node_2_road(jerry: &mut Jerry, world: &mut World, node1: (usize, usize), local_road: Option<&HashSet<ChartedCoordinate>>) -> Vec<ChartedCoordinate> {
+pub fn plan_node_2_road(jerry: &mut Jerry, world: &mut World, node1: (usize, usize), local_road: Option<&HashSet<ChartedCoordinate>>) -> Vec<ChartedCoordinate> {
     let map = robot_map(world).unwrap();
     if let Some(road) = local_road{
         if let Ok(path) = dijkstra(jerry, world, &map, node1, HashSet::new(), Some(Some(&road))){
@@ -58,7 +58,7 @@ pub(crate) fn plan_node_2_road(jerry: &mut Jerry, world: &mut World, node1: (usi
     println!("Failed to plan node_to_road");
     Vec::new()
 }
-pub(crate) fn plan_road_2_global(jerry: &mut Jerry, world: &mut World, road: &HashSet<ChartedCoordinate>) -> Vec<ChartedCoordinate> {
+pub fn plan_road_2_global(jerry: &mut Jerry, world: &mut World, road: &HashSet<ChartedCoordinate>) -> Vec<ChartedCoordinate> {
     let mut ret = Vec::new();
     for node in road.iter(){
         let path1 = plan_node_2_road(jerry, world, (node.0, node.1), None);
@@ -96,7 +96,7 @@ fn shrink_path(path: &mut Vec<ChartedCoordinate>, map: &Vec<Vec<Option<Tile>>>){
 }
 
 //the function gets the sector data and adds new missions for the robot
-pub(crate) fn generate_road_builders(jerry: &mut Jerry, world: &mut World, sector_data: SectorData){
+pub fn generate_road_builders(jerry: &mut Jerry, world: &mut World, sector_data: SectorData){
     let nodes = sector_data.nodes;
     let mut missions = 0;
     let map = robot_map(world).unwrap();
@@ -224,7 +224,7 @@ pub(crate) fn generate_road_builders(jerry: &mut Jerry, world: &mut World, secto
 //calls the road builder
 //should save the last paved to be able to come back after collecting resources
 
-pub(crate) fn new_road_builder(path: &Vec<ChartedCoordinate>) -> Mission{
+pub fn new_road_builder(path: &Vec<ChartedCoordinate>) -> Mission{
     let mut to_pave = HashSet::new();
     for tile in path {
         to_pave.insert(tile.clone());
@@ -240,8 +240,8 @@ pub(crate) fn new_road_builder(path: &Vec<ChartedCoordinate>) -> Mission{
 //ideally, path should not contain crates
 //if it does, the function will skip a tile
 //if it contains a teleport, the function will teleport to that tile
-pub(crate) fn road_builder_execute(jerry: &mut Jerry, world: &mut World, mission_index: usize) -> Result<(), JerryStatus> {
-    let new_tick = true;
+pub fn road_builder_execute(jerry: &mut Jerry, world: &mut World, mission_index: usize) -> Result<(), JerryStatus> {
+    let mut new_tick = true;
     
     /*
         Following algorithm:
@@ -272,7 +272,6 @@ pub(crate) fn road_builder_execute(jerry: &mut Jerry, world: &mut World, mission
         let road_builder_data = mission.additional_data.as_mut().unwrap().downcast_mut::<RoadBuilderData>().unwrap();
         
         //debugging
-        println!("Paving {:?}", mission_index);
         //update web page
         //update_web_page(jerry, &map);
 
@@ -425,7 +424,8 @@ fn bessie_controller(jerry: &mut Jerry, map: &Vec<Vec<Option<Tile>>>, world: &mu
                             else{
                                 if let Err(error) = vent_tool1.borrow_mut().vent_waypoint(jerry, world, 1000){
                                     match error{
-                                        | vent_tool_ascii_crab::VentError::NotEnoughEnergy => return Err(RoadBuilderError::NotEnoughEnergy),
+                                        //pretty much the only error that can happen
+                                        | vent_tool_ascii_crab::VentError::NotEnoughEnergy => return Err(RoadBuilderError::NotEnoughEnergy),   
                                         | vent_tool_ascii_crab::VentError::CommonCrateError(_) => return Err(RoadBuilderError::NotEnoughEnergy),
                                         | _ => panic!("{:?}", error),
                                     }
@@ -470,6 +470,7 @@ fn bessie_controller(jerry: &mut Jerry, map: &Vec<Vec<Option<Tile>>>, world: &mu
                 else{
                     if let Err(error) = vent_tool2.borrow_mut().vent_waypoint(jerry, world, 1000){
                         match error{
+                            //pretty much the only error that can happen
                             | vent_tool_ascii_crab::VentError::NotEnoughEnergy => return Err(RoadBuilderError::NotEnoughEnergy),
                             | vent_tool_ascii_crab::VentError::CommonCrateError(_) => return Err(RoadBuilderError::NotEnoughEnergy),
                             | _ => panic!("{:?}", error),
@@ -541,7 +542,7 @@ fn choose_tile_to_pave(jerry: &mut Jerry, tool: ChartedPaths, mission_index: usi
     let mut candidate_cost = 0;
     //iterate first over the last 10 added frontier tiles then 20 then 30 and so on
     while start > 0{
-        let _end = start;
+        let end = start;
         start = start.saturating_sub(search_depth);
 
         //candidate is the tile with the minimum cost to go to
@@ -589,14 +590,14 @@ fn direction_to_coordinate(coord: (usize, usize), direction: Direction) -> (usiz
     }
 }
 #[derive(Debug, Clone, PartialEq, Copy)]
-pub(crate) enum RoadBuilderError{
+pub enum RoadBuilderError{
     NotEnoughEnergy,
     NotEnoughMaterial,
     CannotGetMaterial,
     RoadNonAccessible,
     CannotPaveTile,
 }
-pub(crate) struct RoadBuilderData{
+pub struct RoadBuilderData{
     to_pave: HashSet<ChartedCoordinate>,
     paved: HashSet<ChartedCoordinate>,
 }

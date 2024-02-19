@@ -16,7 +16,7 @@ use robotics_lib::interface::teleport;
 use robotics_lib::interface::go;
 
 
-pub(crate) fn go_to_coordinates(
+pub fn go_to_coordinates(
     robot: &mut Jerry,
     map: &Vec<Vec<Option<Tile>>>,
     world: &mut World,
@@ -53,7 +53,7 @@ pub(crate) fn go_to_coordinates(
         }
     }
 }
-pub(crate) fn get_path_to_coordinates(
+pub fn get_path_to_coordinates(
     world: &World,
     robot: &mut Jerry,
     map: &Vec<Vec<Option<Tile>>>,
@@ -81,17 +81,17 @@ pub(crate) fn get_path_to_coordinates(
     }
 }
 #[derive(Debug, Clone)]
-pub(crate) enum Action {
+pub enum Action {
     Go(Direction),
     Teleport((usize, usize)),
 }
 
 #[derive(Debug, Default, Clone)]
-pub(crate) struct Path {
-    pub(crate) source: (usize, usize),
-    pub(crate) destination: (usize, usize),
-    pub(crate) actions: VecDeque<Action>,
-    pub(crate) cost: usize,
+pub struct Path {
+    pub source: (usize, usize),
+    pub destination: (usize, usize),
+    pub actions: VecDeque<Action>,
+    pub cost: usize,
 }
 
 impl Path {
@@ -414,7 +414,7 @@ pub(crate) fn get_adjacent_tiles(
 
 
 pub(crate) fn calculate_go_cost(
-    _robot: &impl Runnable,
+    robot: &impl Runnable,
     world: &World,
     map: &Vec<Vec<Option<Tile>>>,
     source: (usize, usize),
@@ -452,7 +452,7 @@ pub(crate) fn calculate_go_cost(
 }
 pub(crate) fn calculate_go_cost_for_road(
     jerry: &Jerry,
-    _world: &World,
+    world: &World,
     map: &Vec<Vec<Option<Tile>>>,
     source: (usize, usize),
     direction: Direction,
@@ -480,7 +480,7 @@ pub(crate) fn calculate_go_cost_for_road(
         return Err(String::from("Go not allowed!"));
     }
 
-    let base_cost = match destination.tile_type {
+    let mut base_cost = match destination.tile_type {
         TileType::Street => 0,
         TileType::Hill => 1,
         TileType::Mountain => 0,

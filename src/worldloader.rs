@@ -52,7 +52,7 @@ impl Grid {
     }
 }
 
-const WORLD_DATA: &'static [u8] = include_bytes!("worlds/world_200.bin");
+const WORLD_DATA: &'static [u8] = include_bytes!("worlds/world_w_o_content.bin");
 
 pub(crate) fn load_as_grid(grid: &mut Grid, _path: PathBuf) {
     // let msg = JsValue::from(format!("LOADER {:?}", WORLD_DATA));

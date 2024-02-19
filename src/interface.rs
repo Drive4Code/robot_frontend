@@ -644,14 +644,14 @@ pub fn timo_ai() -> Html {
                 // info!("[ EVENT ]{}", format!("{:?}", event));
                 // Backpack Updates
                 match event {
-                    Event::AddedToBackpack(_, _) | Event::RemovedFromBackpack(_, _) => {
-                        let new_back = self.get_backpack();
-                        let new_back_content = new_back.get_contents();
-                        let new_inside: HashMap<Content, usize> = (new_back_content.iter())
-                            .map(|content| (content.0.to_owned(), content.1.to_owned()))
-                            .collect();
+                    Event::AddedToBackpack(_, _)  => {
+                        // let new_back = self.get_backpack();
+                        // let new_back_content = new_back.get_contents();
+                        // let new_inside: HashMap<Content, usize> = (new_back_content.iter())
+                        //     .map(|content| (content.0.to_owned(), content.1.to_owned()))
+                        //     .collect();
                         // HERE Implement the code to update a state inside the ai function component with the value of backpack size and content
-                        info!("[ State Update ] New Backpack State {:?}", new_back_content);
+                        //info!("[ State Update ] New Backpack State {:?}", new_back_content);
                         // if self.bps.content != new_inside {
                         //     self.bps.set(BackpackState {
                         //         size: new_back.get_size(),
