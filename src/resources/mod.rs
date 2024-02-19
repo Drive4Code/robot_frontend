@@ -10,7 +10,7 @@ use rust_eze_tomtom::plain::{PlainContent, PlainTileType};
 use rust_eze_tomtom::TomTom;
 use crate::resources::ResourceCollectorError::*;
 //collects a certain resource until the backpack is full
-pub(crate) fn get_content(jerry: &mut Jerry, world: &mut World, content: Content,
+pub fn get_content(jerry: &mut Jerry, world: &mut World, content: Content,
     planned_road: Option<&HashSet<ChartedCoordinate>>, desired_amount: usize) -> Result<usize, ResourceCollectorError> {
    println!("Getting content");
    if desired_amount > jerry.get_backpack().get_size(){
@@ -29,9 +29,9 @@ pub(crate) fn get_content(jerry: &mut Jerry, world: &mut World, content: Content
 }
 
 //disposes the content till the moment there's enough space in the backpack
-pub(crate) fn empty_the_backpack(jerry: &mut Jerry, world: &mut World,
+pub fn empty_the_backpack(jerry: &mut Jerry, world: &mut World,
    planned_road: Option<&HashSet<ChartedCoordinate>>, space_needed: usize) -> Result<(), ResourceCollectorError> {
-       println!("Emptying backpack");
+       println!("Emptying backpack, i inserted {}", space_needed);
        let mut contents: HashSet<Content> = HashSet::new();
        for (content, amount) in jerry.get_backpack_mut().get_contents().iter()
        {
@@ -41,16 +41,12 @@ pub(crate) fn empty_the_backpack(jerry: &mut Jerry, world: &mut World,
        }
        let mut disposed_content = 0;
        //indicator that we cannot dispose anything
-       let mut skipped_all = true;
        while disposed_content < space_needed{
-           skipped_all = true;
+           let mut skipped_all = true;
            for content in contents.iter(){
-               if content.to_default() == Content::Rock(0){
-                   continue;
-               }
                match go_dispose_content(jerry, world, content.to_default().clone(), planned_road){
-                   Ok(amount) => {disposed_content += amount; skipped_all = false},
-                   Err(NotEnoughEnergy) => return Err(NotEnoughEnergy),
+                   Ok(amount) => {println!("Disposed!"); disposed_content += amount; skipped_all = false},
+                   Err(NotEnoughEnergy) => {println!("NEE"); return Err(NotEnoughEnergy);},
                    Err(NoWayToDispose) | Err(NoContentToDispose) | Err(PathNotFound) => continue,
                    _ => panic!("Unexpected error"),
                }
@@ -59,12 +55,13 @@ pub(crate) fn empty_the_backpack(jerry: &mut Jerry, world: &mut World,
                break;
            }
        }
+       println!("Backpack: {:?}", jerry.get_backpack());
        Ok(())
 }
 
 //goes to a tile with a certain content and collects it (not on the tile directly, but on adjacent tiles)
 //returns the amount of collected content
-pub(crate) fn go_get_content(jerry: &mut Jerry, world: &mut World, content: Content) -> Result<usize, ResourceCollectorError> {
+pub fn go_get_content(jerry: &mut Jerry, world: &mut World, content: Content) -> Result<usize, ResourceCollectorError> {
    println!("Going to get content");
    //this is for converting the content to a plain content
    let plain_content = match_to_plain_content(content.clone());
@@ -84,6 +81,23 @@ pub(crate) fn go_get_content(jerry: &mut Jerry, world: &mut World, content: Cont
                panic!("Unexpected error: {}", error);
            }
        }
+   //if the content is rock, we can also search for the mountain tile
+   if content.to_default() == Content::Rock(0){
+       if let Err(error) = 
+       TomTom::go_to_tile(jerry, world, true, Some(PlainTileType::Mountain), None){
+           if error == "Path not found!"{
+               println!("No path found to the resource {:?}", content);
+               return Err(PathNotFound);
+           }
+           else if error == "Not enough energy!"{
+               return Err(NotEnoughEnergy);
+           }
+           else{
+               panic!("Unexpected error: {}", error);
+           }
+       }
+   }
+
    //else we have arrived to a tile adjacent to a given one
    //we can destroy the resource
    let robot_view = where_am_i(jerry, world).0;
@@ -98,7 +112,7 @@ pub(crate) fn go_get_content(jerry: &mut Jerry, world: &mut World, content: Cont
 //dispose a certain resource until it's all gone from the backpack
 //navigates to a closest suitable tile for disposing the resource (again not on the tile directly, but on adjacent tiles)
 //and tries to put it there
-pub(crate) fn go_dispose_content(jerry: &mut Jerry, world: &mut World, content: Content, planned_road: Option<&HashSet<ChartedCoordinate>>) -> Result<usize, ResourceCollectorError> {
+pub fn go_dispose_content(jerry: &mut Jerry, world: &mut World, content: Content, planned_road: Option<&HashSet<ChartedCoordinate>>) -> Result<usize, ResourceCollectorError> {
    println!("Going to dispose content");
    //get the tile types and contents that can hold the content
    let (tile_types, contents) = ways_to_dispose(content.clone());
@@ -148,7 +162,7 @@ pub(crate) fn go_dispose_content(jerry: &mut Jerry, world: &mut World, content: 
    Err(NoWayToDispose)
 }
 
-pub(crate) fn get_content_around(jerry: &mut Jerry, view: &Vec<Vec<Option<Tile>>>, world: &mut World, content: Content) -> Result<usize, ResourceCollectorError>{
+pub fn get_content_around(jerry: &mut Jerry, view: &Vec<Vec<Option<Tile>>>, world: &mut World, content: Content) -> Result<usize, ResourceCollectorError>{
    println!("Trying to get content around");
    if jerry.get_backpack().get_size() == jerry.get_backpack().get_contents().values().sum::<usize>(){
        return Err(BackPackIsFull);
@@ -163,10 +177,27 @@ pub(crate) fn get_content_around(jerry: &mut Jerry, view: &Vec<Vec<Option<Tile>>
                return Err(NotEnoughEnergy);
            }
        }
+       if content.to_default() == Content::Rock(0) && tile.tile_type == TileType::Mountain{
+           if let Ok(amount) = put(jerry, world, Content::None, 0, Direction::Up){
+               total += amount;
+           }
+           else{
+               return Err(NotEnoughEnergy);
+           }
+       }
+       
    }
    if let Some(tile) = &view[1][0]{
        if content.to_default() == tile.content.to_default(){
            if let Ok(amount) = destroy(jerry, world, Direction::Left){
+               total += amount;
+           }
+           else{
+               return Err(NotEnoughEnergy);
+           }
+       }
+       if content.to_default() == Content::Rock(0) && tile.tile_type == TileType::Mountain{
+           if let Ok(amount) = put(jerry, world, Content::None, 0, Direction::Left){
                total += amount;
            }
            else{
@@ -183,10 +214,26 @@ pub(crate) fn get_content_around(jerry: &mut Jerry, view: &Vec<Vec<Option<Tile>>
                return Err(NotEnoughEnergy);
            }
        }
+       if content.to_default() == Content::Rock(0) && tile.tile_type == TileType::Mountain{
+           if let Ok(amount) = put(jerry, world, Content::None, 0, Direction::Right){
+               total += amount;
+           }
+           else{
+               return Err(NotEnoughEnergy);
+           }
+       }
    }
    if let Some(tile) = &view[2][1]{
        if content.to_default() == tile.content.to_default(){
            if let Ok(amount) = destroy(jerry, world, Direction::Down){
+               total += amount;
+           }
+           else{
+               return Err(NotEnoughEnergy);
+           }
+       }
+       if content.to_default() == Content::Rock(0) && tile.tile_type == TileType::Mountain{
+           if let Ok(amount) = put(jerry, world, Content::None, 0, Direction::Down){
                total += amount;
            }
            else{
@@ -480,11 +527,38 @@ fn match_to_plain_tile_type(tile_type: TileType) -> PlainTileType{
    }
 }
 #[derive(Debug, Copy, Clone)]
-pub(crate) enum ResourceCollectorError{
+pub enum ResourceCollectorError{
    BackPackIsFull,
    NotEnoughEnergy,
    PathNotFound,
    NoContentFound,
    NoWayToDispose,
    NoContentToDispose,
+}
+
+#[cfg(test)]
+mod resource_tests {
+   use super::*;
+
+   #[test]
+   fn test_ways_to_dispose() {
+       let content = Content::Tree(0);
+       let (tile_types, contents) = ways_to_dispose(content);
+       // Assert that the returned tile types contain the expected values
+       assert!(tile_types.contains(&TileType::Grass));
+       assert!(!tile_types.contains(&TileType::Sand));
+       assert!(!tile_types.contains(&TileType::Snow));
+       assert!(!tile_types.contains(&TileType::ShallowWater));
+
+       // Assert that the returned contents contain the expected values
+       assert!(contents.len() == 1);
+
+
+       let content = Content::Coin(0);
+       let (tile_types, contents) = ways_to_dispose(content);
+       // Assert that the returned tile types contain the expected values
+       assert!(tile_types.contains(&TileType::Sand));
+       assert!(!tile_types.contains(&TileType::Lava));
+       assert_eq!(contents.len(), 1);
+   }
 }
