@@ -409,21 +409,20 @@ fn update_frontier(jerry: &mut Jerry, world: &mut World, map: &Vec<Vec<Option<Ti
 
             let tile_coord = ChartedCoordinate(i, j);
             let spatial_index = calculate_spatial_index(i, j, map.len());
-
+        
             //check if there's a mission for the spatial index of the tile that has the status New
             //in this case we don't need to initialize a new mission
             let jerry_immut = jerry.borrow();
             let data: &ExplorerData = jerry_immut.missions.get(mission_index).unwrap().additional_data.as_ref().unwrap().downcast_ref().unwrap();
             let mission_exists = jerry_immut.missions.iter().any(|mission| {
                 if let Some(explorer_data) = mission.additional_data.as_ref().unwrap().downcast_ref::<ExplorerData>(){
-                    explorer_data.spatial_index == spatial_index && (mission.status == New || mission.status == Active)
+                    explorer_data.spatial_index == spatial_index && ((mission.status == New) || (mission.status == Active))
                 }
                 else{
                     false
                 }
             });
             drop(jerry_immut);
-
             //if the tile is a frontier tile and it's not in the current mission's spatial index
             //so we need to initialize a new mission for the new spatial index
             //make sure that some tiles around the robot view are unknown to avoid exploring the same area twice
@@ -444,6 +443,34 @@ fn update_frontier(jerry: &mut Jerry, world: &mut World, map: &Vec<Vec<Option<Ti
                 println!("New frontier {:?}", new_mission.additional_data.as_ref().unwrap().downcast_ref::<ExplorerData>().unwrap().frontier_hs);
                 jerry_mut.borrow_mut().missions.push_back(new_mission);
                 println!("New mission \"Explore\" for spatial index {}", spatial_index);
+
+            }
+            
+            //check if new mission exists for the spatial index of the tile
+            let new_mission_exists = jerry_c.borrow().missions.iter().any(|mission| {
+                if let Some(explorer_data) = mission.additional_data.as_ref().unwrap().downcast_ref::<ExplorerData>(){
+                    explorer_data.spatial_index == spatial_index && (mission.status == New)
+                }
+                else{
+                    false
+                }
+            });
+            if new_mission_exists && new_sector_unknown{
+                let mut jerry_c = jerry_c.borrow_mut();
+                let existing_mission_index = jerry_c.missions.iter().position(|mission| {
+                    if let Some(explorer_data) = mission.additional_data.as_ref().unwrap().downcast_ref::<ExplorerData>(){
+                        explorer_data.spatial_index == spatial_index && (mission.status == New)
+                    }
+                    else{
+                        false
+                    }
+                }).unwrap();
+                let mut mission = jerry_c.missions.get_mut(existing_mission_index).unwrap();
+                let data: &mut ExplorerData = mission.additional_data.as_mut().unwrap().downcast_mut().unwrap();
+                if !data.frontier_hs.contains(&tile_coord) && is_frontier(map, (tile_coord.0, tile_coord.1)){
+                    data.frontier.push(tile_coord);
+                    data.frontier_hs.insert(tile_coord);
+                }
             }
             
             let mut jerry_mut = jerry_c.borrow_mut();
