@@ -49,10 +49,13 @@ pub fn analyzer_execute(world: &mut World, tl: (usize, usize), br: (usize, usize
         coord.1 += tl.1;
     }
     let mut nodes = vec![get_centroid(&zone)];
-    println!("{:?}", get_centroid(&zone));
     if is_random{
+        if let Some(hs) = &sector_resources.1{
+            let amount = sector_resources.2;
+            nodes.push(get_weighted_centroid(&hs.iter().map(|(i, j, _)| (*i, *j, 1)).collect(), amount));
+        }
         return SectorData {
-            resources: sector_resources,
+            resources: sector_resources.0,
             mountain_tiles,
             is_random: true,
             nodes: nodes,
@@ -83,7 +86,7 @@ pub fn analyzer_execute(world: &mut World, tl: (usize, usize), br: (usize, usize
         nodes.push(centroid);
     }
     SectorData {
-        resources: sector_resources,
+        resources: sector_resources.0,
         mountain_tiles,
         is_random: false,
         nodes,
@@ -91,26 +94,40 @@ pub fn analyzer_execute(world: &mut World, tl: (usize, usize), br: (usize, usize
 
 
 }
-pub fn sector_collectable(sector: &Vec<Vec<Option<Tile>>>) -> HashMap<Content, usize>{
+pub fn sector_collectable(sector: &Vec<Vec<Option<Tile>>>) -> (HashMap<Content, usize>, Option<HashSet<(usize, usize, usize)>>, usize){
     let mut resources = HashMap::new();
-    for row in sector.iter(){
-        for tile in row.iter(){
+    let mut resource_tiles: HashMap<Content, HashSet<(usize, usize, usize)>> = HashMap::new();
+    let mut tiles_w_most_frequent:HashSet<(usize, usize, usize)> = HashSet::new();
+    let mut max_content_amount = 0;
+    for (i, row) in sector.iter().enumerate(){
+        for (j, tile) in row.iter().enumerate(){
             if let Some(tile) = tile{
                 let content = &tile.content;
                 if !content.properties().destroy(){
                     continue;
                 }  
                 let mut count = resources.entry(content.to_default().clone()).or_insert(0);
+
                 match content.get_value(){
                     (Some(amount), None) => {
                         *count += amount;
+                        let entry = resource_tiles.entry(content.to_default().clone()).or_insert_with(|| HashSet::new());
+                        entry.insert((i, j, amount));
                     }
                     (_, _) => {}
                 }
             }
         }
     }
-    resources
+    let most_frequent = resources.iter().max_by_key(|(k, v)| *v);
+    if let Some((content, amount)) = most_frequent{
+        let tiles = resource_tiles.remove(content);
+        max_content_amount = *amount;
+        if let Some(tiles) = tiles{
+            return (resources, Some(tiles), max_content_amount);
+        }
+    }
+    (resources, None, 0)
 }
 
 #[derive(Debug)]
@@ -204,6 +221,15 @@ fn get_centroid(cores: &Vec<(usize, usize)>) -> (usize, usize){
     }
     (x/cores.len(), y/cores.len())
 }
+fn get_weighted_centroid(cores: &Vec<(usize, usize, usize)>, total: usize) -> (usize, usize){
+    let mut x = 0;
+    let mut y = 0;
+    for core in cores.iter(){
+        x += core.0 * core.2;
+        y += core.1 * core.2;
+    }
+    (x/total, y/total)
+}
 mod dbscan;
 
 
@@ -239,7 +265,12 @@ mod tests {
             hm.insert(Content::Fire, 1);
             hm
         };
-        assert_eq!(sector_collectable(&sector), expected);
+        let mut expected_tiles: HashSet<(usize, usize, usize)> = HashSet::new();
+        expected_tiles.insert((0, 0, 3));
+        expected_tiles.insert((0, 1, 3));
+        expected_tiles.insert((0, 2, 3));
+
+        assert_eq!(sector_collectable(&sector), (expected, Some(expected_tiles), 9));
     }
     #[test]
     fn test_find_largest_connected_subset(){
@@ -263,5 +294,10 @@ mod tests {
         let subset = find_largest_connected_subset(&map);
         println!("{:?}", subset);
         assert_eq!(subset.len(), 3);
+    }
+    #[test]
+    fn test_get_weighted_centroid(){
+        let cores = vec![(0, 0, 0), (0, 2, 2)];
+        assert_eq!(get_weighted_centroid(&cores, 2), (0, 2));
     }
 }
