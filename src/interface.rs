@@ -651,13 +651,14 @@ pub fn timo_ai() -> Html {
                             .map(|content| (content.0.to_owned(), content.1.to_owned()))
                             .collect();
                         // HERE Implement the code to update a state inside the ai function component with the value of backpack size and content
-                        if self.bps.content != new_inside {
-                            self.bps.set(BackpackState {
-                                size: new_back.get_size(),
-                                content: new_inside,
-                            });
-                            info!("[ State Update ] New Backpack State");
-                        }
+                        info!("[ State Update ] New Backpack State {:?}", new_back_content);
+                        // if self.bps.content != new_inside {
+                        //     self.bps.set(BackpackState {
+                        //         size: new_back.get_size(),
+                        //         content: new_inside,
+                        //     });
+                        //     info!("[ State Update ] New Backpack State");
+                        // }
                     }
                     Event::Moved(_, position) => {
                         if position.0 >= self.active_region.bottom_right.0 {
