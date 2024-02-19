@@ -143,7 +143,7 @@ impl Default for StartingSettings {
 #[function_component(Main)]
 pub fn main() -> Html {
     let settings = use_atom::<StartingSettings>();
-    info!("Rendered Main");
+    // info!("Rendered Main");
 
     html! {
         html! {
@@ -599,7 +599,7 @@ pub fn timo_ai() -> Html {
     let extra_state = use_atom::<ExtrasState>();
     let settings = use_atom::<StartingSettings>();
 
-    info!("Ai Running");
+    // info!("Ai Running");
     // let runner_ref = use_state_eq(|| None); timeout_jerry
     {
         impl Runnable for Jerry {
@@ -614,7 +614,7 @@ pub fn timo_ai() -> Html {
                 // Update UI State
                 let tmp_map = robot_map(&world).unwrap_or_default();
                 let tmp_conditions = look_at_sky(&world);
-                info!("{:?} Internal Map", tmp_map);
+                // info!("{:?} Internal Map", tmp_map);
                 if tmp_map != self.ws.world {
                     self.ws.set(WorldState {
                         world: tmp_map,
@@ -783,7 +783,7 @@ async fn run_game(
     // let mut counter = 0;
     sleep(1000).await;
     for _ in 0..100000 {
-        info!("[ RUNNER ] Tick {:?}", tick_time);
+        // info!("[ RUNNER ] Tick {:?}", tick_time);
         // Get a mutable reference to the Result<Runner>
         let mut runner_result = run.borrow_mut();
         // Handle the Result using map and map_err
