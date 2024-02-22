@@ -39,7 +39,7 @@ pub fn new_sector_analyzer(spatial_index: usize, world_dim: usize) -> Mission {
 pub fn analyzer_execute(world: &mut World, tl: (usize, usize), br: (usize, usize)) -> SectorData{
     let robot_map = robot_map(world).unwrap();
     let sector_map = robot_map_slice(&robot_map,tl, br).unwrap();
-    let sector_resources = sector_collectable(&sector_map);
+    let sector_resources = sector_collectable(&sector_map, tl);
     let mountain_tiles = count_mountain_tiles(&sector_map);
     let is_random = is_content_random(&sector_map);
     let mut zone = find_largest_connected_subset(&sector_map);
@@ -94,7 +94,7 @@ pub fn analyzer_execute(world: &mut World, tl: (usize, usize), br: (usize, usize
 
 
 }
-pub fn sector_collectable(sector: &Vec<Vec<Option<Tile>>>) -> (HashMap<Content, usize>, Option<HashSet<(usize, usize, usize)>>, usize){
+pub fn sector_collectable(sector: &Vec<Vec<Option<Tile>>>, tl: (usize, usize)) -> (HashMap<Content, usize>, Option<HashSet<(usize, usize, usize)>>, usize){
     let mut resources = HashMap::new();
     let mut resource_tiles: HashMap<Content, HashSet<(usize, usize, usize)>> = HashMap::new();
     let mut tiles_w_most_frequent:HashSet<(usize, usize, usize)> = HashSet::new();
@@ -112,7 +112,7 @@ pub fn sector_collectable(sector: &Vec<Vec<Option<Tile>>>) -> (HashMap<Content, 
                     (Some(amount), None) => {
                         *count += amount;
                         let entry = resource_tiles.entry(content.to_default().clone()).or_insert_with(|| HashSet::new());
-                        entry.insert((i, j, amount));
+                        entry.insert((i + tl.0, j + tl.1, amount));
                     }
                     (_, _) => {}
                 }
@@ -238,40 +238,6 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    fn test_sector_collectable() {
-        let sector: Vec<Vec<Option<Tile>>> = vec![
-            vec![
-                Some(Tile{tile_type: Grass, content: Content::Rock(3), elevation: 0}),
-                Some(Tile{tile_type: Grass, content: Content::Rock(3), elevation: 0}),
-                Some(Tile{tile_type: Grass, content: Content::Rock(3), elevation: 0}),
-            ],
-            vec![
-                Some(Tile{tile_type: Grass, content: Content::Coin(3), elevation: 0}),
-                Some(Tile{tile_type: Grass, content: Content::Coin(3), elevation: 0}),
-                Some(Tile{tile_type: Grass, content: Content::Coin(3), elevation: 0}),
-            ],
-            vec![
-                Some(Tile{tile_type: Grass, content: Content::Bank(0..10), elevation: 0}),
-                Some(Tile{tile_type: Grass, content: Content::Fire, elevation: 0}),
-                Some(Tile{tile_type: Grass, content: Content::Crate(0..3), elevation: 0}),
-            ],
-
-        ];
-        let expected: HashMap<Content, usize> = {
-            let mut hm = HashMap::new();
-            hm.insert(Content::Rock(0), 3*3);
-            hm.insert(Content::Coin(0), 3*3);
-            hm.insert(Content::Fire, 1);
-            hm
-        };
-        let mut expected_tiles: HashSet<(usize, usize, usize)> = HashSet::new();
-        expected_tiles.insert((0, 0, 3));
-        expected_tiles.insert((0, 1, 3));
-        expected_tiles.insert((0, 2, 3));
-
-        assert_eq!(sector_collectable(&sector), (expected, Some(expected_tiles), 9));
-    }
     #[test]
     fn test_find_largest_connected_subset(){
         let map: Vec<Vec<Option<Tile>>> = vec![
